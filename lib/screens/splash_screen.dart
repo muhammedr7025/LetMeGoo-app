@@ -283,7 +283,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     children: [
                       Text(
-                        'Let Me Go',
+                        'Let Me Goo',
                         style: AppFonts.bold24().copyWith(
                           fontSize:
                               screenWidth *
@@ -299,7 +299,7 @@ class _SplashScreenState extends State<SplashScreen>
                       SizedBox(height: screenHeight * 0.01),
 
                       Text(
-                        'Smart Parking Solutions',
+                        'Smart app to unblock your way!',
                         style: AppFonts.regular16().copyWith(
                           fontSize:
                               screenWidth *

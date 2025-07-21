@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:letmegoo/constants/app_theme.dart';
+import 'package:letmegoo/screens/about_us_page.dart';
 import 'package:letmegoo/screens/my_vehicles_page.dart';
 import 'package:letmegoo/screens/privacy_policy_page.dart';
 import 'package:letmegoo/screens/privacy_preferences_page.dart';
@@ -345,9 +346,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 ),
                                 onTap: () {
                                   // Handle about us - you can create an AboutUsPage similar to PrivacyPolicyPage
-                                  _showSnackBar(
-                                    'About Us page coming soon!',
-                                    isError: false,
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const AboutUsPage(),
+                                    ),
                                   );
                                 },
                               ),

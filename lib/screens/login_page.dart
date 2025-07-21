@@ -288,19 +288,19 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       LoginActionRow(
                         icon: Icons.camera_alt_outlined,
-                        label: "Snap a photo",
+                        label: "Find owner",
                         color: Color(0xFF31C5F4),
                         showConnector: true,
                       ),
                       LoginActionRow(
                         icon: Icons.alarm,
-                        label: "Report in 10 seconds",
+                        label: "Report in one minute",
                         color: Color(0xFF31C5F4),
                         showConnector: true,
                       ),
                       LoginActionRow(
                         icon: Icons.notifications_active_outlined,
-                        label: "We'll try to alert the vehicle owner",
+                        label: "Get help & save time!",
                         color: Color(0xFF31C5F4),
                       ),
                     ],

@@ -76,6 +76,22 @@ class VehicleSearchNotifier extends StateNotifier<AsyncValue<Vehicle?>> {
   }
 }
 
+// Message options enum
+enum MessageOption {
+  blocking(
+    'Blocking Path',
+    'Your vehicle XXXX is blocking my way, please provide assistance to unblock my way. Thank you.',
+  ),
+  parkingIssue(
+    'Parking Issue',
+    'Please come and visit your vehicle, it\'s parking light is on/its key is in it.',
+  );
+
+  const MessageOption(this.displayText, this.messageTemplate);
+  final String displayText;
+  final String messageTemplate;
+}
+
 // UI Component
 class CreateReportPage extends ConsumerStatefulWidget {
   final String? registrationNumber;
@@ -95,12 +111,12 @@ class CreateReportPage extends ConsumerStatefulWidget {
 
 class _CreateReportPageState extends ConsumerState<CreateReportPage> {
   final TextEditingController regNumberController = TextEditingController();
-  final TextEditingController messageController = TextEditingController();
   final LocationService _locationService = LocationService();
 
   bool isAnonymous = true;
   List<File> _images = [];
   bool _isLocationLoading = false;
+  MessageOption? selectedMessageOption;
   bool get isReportMode => widget.registrationNumber != null;
 
   @override
@@ -115,8 +131,18 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
   @override
   void dispose() {
     regNumberController.dispose();
-    messageController.dispose();
     super.dispose();
+  }
+
+  // Get the final message with vehicle number replaced
+  String _getFinalMessage() {
+    if (selectedMessageOption == null) return '';
+
+    final vehicleNumber = regNumberController.text.trim();
+    return selectedMessageOption!.messageTemplate.replaceAll(
+      'XXXX',
+      vehicleNumber,
+    );
   }
 
   Future<void> _pickImages() async {
@@ -280,9 +306,8 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
 
   void _handleInformTap() async {
     final regNumber = regNumberController.text.trim();
-    final message = messageController.text.trim();
 
-    if (regNumber.isEmpty) {
+    if (regNumber.isEmpty || selectedMessageOption == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("Please fill all required fields"),
@@ -305,11 +330,13 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
       position.longitude,
     );
 
+    final finalMessage = _getFinalMessage();
+
     final request = ReportRequest(
       vehicleId: regNumber, // Using registration number as vehicleId
       images: _images,
       isAnonymous: isAnonymous,
-      notes: message,
+      notes: finalMessage, // Use the generated message
       longitude: position.longitude.toString(),
       latitude: position.latitude.toString(),
       location: location,
@@ -563,36 +590,11 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
                           if (isReportMode) ...[
                             SizedBox(height: screenHeight * 0.025),
 
-                            // Message Field
-                            TextField(
-                              controller: messageController,
-                              maxLines: 3,
-                              style: TextStyle(
-                                fontSize:
-                                    screenWidth *
-                                    (isLargeScreen
-                                        ? 0.016
-                                        : isTablet
-                                        ? 0.025
-                                        : 0.04),
-                                color: AppColors.textPrimary,
-                              ),
+                            // Message Type Dropdown
+                            DropdownButtonFormField<MessageOption>(
+                              value: selectedMessageOption,
                               decoration: InputDecoration(
-                                hintText:
-                                    "Enter the message to the owner of this vehicle",
-                                hintStyle: TextStyle(
-                                  fontSize:
-                                      screenWidth *
-                                      (isLargeScreen
-                                          ? 0.014
-                                          : isTablet
-                                          ? 0.022
-                                          : 0.035),
-                                  color: AppColors.textSecondary.withOpacity(
-                                    0.6,
-                                  ),
-                                ),
-                                labelText: "Message",
+                                labelText: "Select Message Type",
                                 labelStyle: TextStyle(
                                   fontSize:
                                       screenWidth *
@@ -603,7 +605,6 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
                                           : 0.035),
                                   color: AppColors.textSecondary,
                                 ),
-                                alignLabelWithHint: true,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide: BorderSide(
@@ -634,7 +635,91 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
                                   vertical: screenHeight * 0.02,
                                 ),
                               ),
+                              items:
+                                  MessageOption.values.map((option) {
+                                    return DropdownMenuItem<MessageOption>(
+                                      value: option,
+                                      child: Text(
+                                        option.displayText,
+                                        style: TextStyle(
+                                          fontSize:
+                                              screenWidth *
+                                              (isLargeScreen
+                                                  ? 0.016
+                                                  : isTablet
+                                                  ? 0.025
+                                                  : 0.04),
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                              onChanged: (MessageOption? newValue) {
+                                setState(() {
+                                  selectedMessageOption = newValue;
+                                });
+                              },
+                              hint: Text(
+                                "Choose a message type",
+                                style: TextStyle(
+                                  fontSize:
+                                      screenWidth *
+                                      (isLargeScreen
+                                          ? 0.014
+                                          : isTablet
+                                          ? 0.022
+                                          : 0.035),
+                                  color: AppColors.textSecondary.withOpacity(
+                                    0.6,
+                                  ),
+                                ),
+                              ),
                             ),
+
+                            // Show message preview if option is selected
+                            if (selectedMessageOption != null) ...[
+                              SizedBox(height: screenHeight * 0.02),
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.all(screenWidth * 0.04),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppColors.primary.withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.preview,
+                                          color: AppColors.primary,
+                                          size: screenWidth * 0.04,
+                                        ),
+                                        SizedBox(width: screenWidth * 0.02),
+                                        Text(
+                                          'Message Preview:',
+                                          style: AppFonts.semiBold14().copyWith(
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: screenWidth * 0.02),
+                                    Text(
+                                      _getFinalMessage(),
+                                      style: AppFonts.regular14().copyWith(
+                                        color: AppColors.textPrimary,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
 
                             SizedBox(height: screenHeight * 0.025),
 
