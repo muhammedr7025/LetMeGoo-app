@@ -144,6 +144,9 @@ class Report {
   }
 
   // Convert to the format your existing widgets expect
+  // lib/models/report.dart - Fix the toWidgetFormat method
+
+  // Convert to the format your existing widgets expect
   Map<String, dynamic> toWidgetFormat() {
     try {
       final widgetData = {
@@ -152,9 +155,18 @@ class Report {
         'location': displayLocation,
         'message': displayMessage,
         'reporter': displayReporter,
-        'profileImage': profileImage,
+        'profileImage': profileImage, // Reporter's profile picture
         'latitude': latitude,
         'longitude': longitude,
+        // ADD THESE LINES - Include report images
+        'images':
+            images
+                .map((img) => img.bestImage)
+                .where((url) => url != null)
+                .toList(),
+        'hasImages': images.isNotEmpty,
+        'imageCount': images.length,
+        'firstImage': images.isNotEmpty ? images.first.bestImage : null,
       };
       print('🎨 Widget format for ${id}: $widgetData');
       return widgetData;
@@ -169,6 +181,11 @@ class Report {
         'profileImage': null,
         'latitude': null,
         'longitude': null,
+        // ADD THESE FALLBACK VALUES TOO
+        'images': [],
+        'hasImages': false,
+        'imageCount': 0,
+        'firstImage': null,
       };
     }
   }

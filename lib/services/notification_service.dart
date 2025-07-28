@@ -1,10 +1,21 @@
+// lib/services/notification_service.dart - Enhanced version with navigation
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:letmegoo/services/device_service.dart';
+import 'package:letmegoo/screens/home_page.dart';
+import 'package:letmegoo/widgets/main_app.dart';
 
 class NotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   static String? _pendingToken;
+  static GlobalKey<NavigatorState>? _navigatorKey;
+
+  // Set the navigator key from main.dart
+  static void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
+  }
 
   /// Initialize Firebase Messaging
   static Future<void> initialize() async {
@@ -21,7 +32,6 @@ class NotificationService {
       // Only proceed if authorized
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        
         // Get initial token but don't update yet
         final token = await _messaging.getToken();
         if (token != null) {
@@ -37,7 +47,7 @@ class NotificationService {
 
         // Set up message handlers
         _setupMessageHandlers();
-        
+
         // Listen for auth state changes to update token when user logs in
         FirebaseAuth.instance.authStateChanges().listen((User? user) {
           if (user != null && _pendingToken != null) {
@@ -62,7 +72,9 @@ class NotificationService {
     } else {
       // User not logged in, store for later
       _pendingToken = newToken;
-      print('Token refresh received but user not authenticated, storing for later');
+      print(
+        'Token refresh received but user not authenticated, storing for later',
+      );
     }
   }
 
@@ -87,22 +99,27 @@ class NotificationService {
 
   static Future<void> _checkInitialMessage() async {
     // Get any messages which caused the application to open from terminated state
-    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-    
+    RemoteMessage? initialMessage =
+        await FirebaseMessaging.instance.getInitialMessage();
+
     if (initialMessage != null) {
-      print('App opened from notification: ${initialMessage.notification?.title}');
-      _handleNotificationTap(initialMessage);
+      print(
+        'App opened from notification: ${initialMessage.notification?.title}',
+      );
+      // Delay navigation to ensure app is fully loaded
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        _handleNotificationTap(initialMessage);
+      });
     }
   }
 
   static void _handleForegroundMessage(RemoteMessage message) {
     // Handle the message when app is in foreground
-    // You might want to show a local notification here
     if (message.notification != null) {
       print('Notification Title: ${message.notification!.title}');
       print('Notification Body: ${message.notification!.body}');
     }
-    
+
     // Handle data payload
     if (message.data.isNotEmpty) {
       print('Message data: ${message.data}');
@@ -110,39 +127,85 @@ class NotificationService {
   }
 
   static void _handleNotificationTap(RemoteMessage message) {
-    // Handle navigation based on notification data
+    print('🔔 Handling notification tap...');
+
+    // Always navigate to homepage when notification is tapped
+    _navigateToHomePage();
+
+    // Handle specific data if needed
     if (message.data.isNotEmpty) {
-      // Example: Navigate to specific screen based on data
-      final String? screen = message.data['screen'];
-      if (screen != null) {
-        // Navigate to the specified screen
-        print('Navigate to: $screen');
+      print('Message data: ${message.data}');
+
+      // You can add specific navigation logic here based on data
+      final String? type = message.data['type'];
+      final String? reportId = message.data['report_id'];
+
+      switch (type) {
+        case 'report_status':
+          // Could navigate to specific report if needed
+          print('Report notification: $reportId');
+          break;
+        case 'vehicle_reported':
+          // Could navigate to specific vehicle report
+          print('Vehicle reported: $reportId');
+          break;
+        default:
+          // Default behavior - just go to homepage
+          break;
       }
     }
   }
 
-  /// Call this after successful login to ensure device is registered
-  static Future<void> onUserAuthenticated() async {
-    try {
-      // Ensure device is registered
-      await DeviceService.ensureDeviceRegistered();
-      
-      // If we have a pending token, update it now
-      if (_pendingToken != null) {
-        await DeviceService.updateDeviceToken(_pendingToken!);
-        _pendingToken = null;
-      }
-    } catch (e) {
-      print('Error in onUserAuthenticated: $e');
+  static void _navigateToHomePage() {
+    print('🏠 Navigating to homepage...');
+
+    if (_navigatorKey?.currentContext != null) {
+      final BuildContext context = _navigatorKey!.currentContext!;
+
+      // Navigate to HomePage - replace current route with homepage
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) => HomePage(
+                onNavigate: (index) {
+                  // Handle navigation if needed
+                  print('Homepage navigation: $index');
+                },
+                onAddPressed: () {
+                  // Handle add button if needed
+                  print('Homepage add pressed');
+                },
+              ),
+        ),
+        (route) => false, // Remove all previous routes
+      );
+
+      print('✅ Navigation to homepage completed');
+    } else {
+      print('❌ Navigator context not available');
+
+      // Fallback: Try to navigate using a global approach
+      _navigateToMainApp();
     }
   }
 
-  /// Call this before logout
-  static Future<void> onUserLogout() async {
-    try {
-      await DeviceService.unregisterDevice();
-    } catch (e) {
-      print('Error in onUserLogout: $e');
+  static void _navigateToMainApp() {
+    print('🔄 Fallback: Navigating to MainApp...');
+
+    if (_navigatorKey?.currentContext != null) {
+      final BuildContext context = _navigatorKey!.currentContext!;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const MainApp()),
+        (route) => false,
+      );
+
+      print('✅ Navigation to MainApp completed');
     }
+  }
+
+  // Method to manually trigger navigation to homepage (for testing)
+  static void navigateToHomePage() {
+    _navigateToHomePage();
   }
 }

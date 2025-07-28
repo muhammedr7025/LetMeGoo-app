@@ -31,6 +31,10 @@ class AppColors {
   // Additional helpful colors
   static const Color white = Color(0xFFFFFFFF);
   static const Color transparent = Colors.transparent;
+
+  static var grey;
+
+  static var accent;
 }
 
 class AppFonts {

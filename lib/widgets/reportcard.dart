@@ -1,3 +1,5 @@
+// lib/widgets/reportcard.dart - Updated with map navigation functionality
+
 import 'package:flutter/material.dart';
 import 'package:letmegoo/constants/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,11 +8,15 @@ class ReportCard extends StatelessWidget {
   final String timeDate;
   final String status;
   final String location;
-  final String? latitude; // Make nullable
-  final String? longitude; // Make nullable
   final String message;
   final String reporter;
   final String? profileImage;
+  final String? latitude;
+  final String? longitude;
+  // ADD THESE NEW PARAMETERS
+  final List<String>? images;
+  final bool? hasImages;
+  final String? firstImage;
 
   const ReportCard({
     super.key,
@@ -20,271 +26,217 @@ class ReportCard extends StatelessWidget {
     required this.message,
     required this.reporter,
     this.profileImage,
-    this.latitude, // Remove required
-    this.longitude, // Remove required
+    this.latitude,
+    this.longitude,
+    // ADD THESE TO CONSTRUCTOR
+    this.images,
+    this.hasImages,
+    this.firstImage,
   });
 
-  // Function to open Google Maps with coordinates
-  Future<void> _openGoogleMaps(BuildContext context) async {
-    if (latitude != null && longitude != null) {
-      try {
-        // Parse coordinates to ensure they're valid
-        final lat = double.parse(latitude!);
-        final lng = double.parse(longitude!);
+  /// Open map with coordinates
+  Future<void> _openMap(BuildContext context) async {
+    if (latitude == null || longitude == null) {
+      _showSnackBar(
+        context,
+        'Location coordinates not available',
+        isError: true,
+      );
+      return;
+    }
 
-        // Create Google Maps URL
-        final googleMapsUrl =
-            'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
-        final Uri uri = Uri.parse(googleMapsUrl);
+    try {
+      final double lat = double.parse(latitude!);
+      final double lng = double.parse(longitude!);
 
-        // Try to launch the URL
+      // Create map URLs for different platforms
+      final String googleMapsUrl =
+          'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+      final String appleMapsUrl = 'https://maps.apple.com/?q=$lat,$lng';
+      final String universalUrl = 'geo:$lat,$lng';
+
+      // Try to launch in order of preference
+      List<String> urls = [
+        googleMapsUrl, // Works on both Android and iOS
+        appleMapsUrl, // iOS fallback
+        universalUrl, // Android fallback
+      ];
+
+      bool launched = false;
+
+      for (String url in urls) {
+        final Uri uri = Uri.parse(url);
+
         if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          _showLocationError(context, 'Could not open Google Maps');
+          launched = await launchUrl(
+            uri,
+            mode: LaunchMode.externalApplication, // Open in external maps app
+          );
+
+          if (launched) {
+            print('🗺️ Successfully opened map with: $url');
+            break;
+          }
         }
-      } catch (e) {
-        _showLocationError(context, 'Invalid location coordinates');
       }
-    } else {
-      _showLocationNotAvailable(context);
+
+      if (!launched) {
+        _showSnackBar(context, 'No maps application available', isError: true);
+      }
+    } catch (e) {
+      print('❌ Error opening map: $e');
+      _showSnackBar(
+        context,
+        'Error opening map: Invalid coordinates',
+        isError: true,
+      );
     }
   }
 
-  // Show error when location cannot be opened
-  void _showLocationError(BuildContext context, String message) {
+  /// Show snackbar message
+  void _showSnackBar(
+    BuildContext context,
+    String message, {
+    required bool isError,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.white),
-            SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.red[600],
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        margin: EdgeInsets.all(16),
       ),
     );
-  }
-
-  // Show message when location is not available
-  void _showLocationNotAvailable(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.location_off, color: Colors.orange),
-              SizedBox(width: 12),
-              Text('Location Not Available'),
-            ],
-          ),
-          content: Text(
-            'The reporter didn\'t attach location coordinates for this report.',
-            style: AppFonts.regular14(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'OK',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Check if location coordinates are available and valid
-  bool get hasValidLocation {
-    if (latitude == null || longitude == null) return false;
-    try {
-      double.parse(latitude!);
-      double.parse(longitude!);
-      return true;
-    } catch (e) {
-      return false;
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth > 600;
-    final isLargeScreen = screenWidth > 900;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isTablet = screenWidth > 600 && screenWidth < 1024;
+    final isLargeScreen = screenWidth >= 1024;
 
-    // Debug logging
-    print("🔍 ReportCard build:");
-    print("  - Latitude: $latitude");
-    print("  - Longitude: $longitude");
-    print("  - Location: $location");
-    print("  - Has valid location: $hasValidLocation");
+    final bool hasValidLocation = latitude != null && longitude != null;
 
-    // Status color based on status
-    Color statusColor;
-    Color statusBgColor;
-    switch (status.toLowerCase()) {
-      case 'active':
-        statusColor = AppColors.darkRed;
-        statusBgColor = AppColors.lightRed;
-        break;
-      case 'solved':
-        statusColor = AppColors.darkGreen;
-        statusBgColor = AppColors.lightGreen;
-        break;
-      default:
-        statusColor = AppColors.textSecondary;
-        statusBgColor = AppColors.textSecondary.withOpacity(0.1);
-    }
-
-    return InkWell(
-      child: Container(
-        width: double.infinity,
-        margin: EdgeInsets.symmetric(
-          vertical: screenWidth * 0.01,
-          horizontal: screenWidth * 0.005,
-        ),
-        padding: EdgeInsets.all(screenWidth * 0.04),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Time and Status Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Text(
-                    timeDate,
-                    style: AppFonts.regular14().copyWith(
-                      fontSize:
-                          screenWidth *
-                          (isLargeScreen
-                              ? 0.012
-                              : isTablet
-                              ? 0.02
-                              : 0.035),
-                      color: AppColors.textSecondary,
-                    ),
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(screenWidth * 0.04),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Time and Status Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  timeDate,
+                  style: AppFonts.regular14().copyWith(
+                    fontSize:
+                        screenWidth *
+                        (isLargeScreen
+                            ? 0.012
+                            : isTablet
+                            ? 0.02
+                            : 0.032),
+                    color: AppColors.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth * 0.025,
+                  vertical: screenWidth * 0.01,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      status.toLowerCase() == 'active'
+                          ? AppColors.lightRed
+                          : AppColors.lightGreen,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  status,
+                  style: AppFonts.semiBold14().copyWith(
+                    fontSize:
+                        screenWidth *
+                        (isLargeScreen
+                            ? 0.012
+                            : isTablet
+                            ? 0.02
+                            : 0.032),
+                    color:
+                        status.toLowerCase() == 'active'
+                            ? AppColors.darkRed
+                            : AppColors.darkGreen,
                   ),
                 ),
-                Container(
+              ),
+            ],
+          ),
+
+          SizedBox(height: screenWidth * 0.025),
+
+          // Location Row (if available) - Updated with tap functionality
+          if (hasValidLocation)
+            Padding(
+              padding: EdgeInsets.only(bottom: screenWidth * 0.025),
+              child: GestureDetector(
+                onTap: () => _openMap(context), // Add tap functionality here
+                child: Container(
                   padding: EdgeInsets.symmetric(
                     horizontal: screenWidth * 0.025,
-                    vertical: screenWidth * 0.01,
+                    vertical: screenWidth * 0.015,
                   ),
                   decoration: BoxDecoration(
-                    color: statusBgColor,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                      width: 1,
+                    ),
+                    // Add subtle background to indicate it's clickable
+                    color: AppColors.primary.withOpacity(0.05),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: screenWidth * 0.02,
-                        height: screenWidth * 0.02,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
+                      Icon(
+                        Icons.location_on,
+                        size: screenWidth * 0.04,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: screenWidth * 0.02),
+                      Flexible(
+                        child: Text(
+                          "View vehicle location on map",
+                          style: AppFonts.regular14().copyWith(
+                            fontSize:
+                                screenWidth *
+                                (isLargeScreen
+                                    ? 0.014
+                                    : isTablet
+                                    ? 0.022
+                                    : 0.035),
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                            decorationColor: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                      SizedBox(width: screenWidth * 0.015),
-                      Text(
-                        status,
-                        style: AppFonts.semiBold14().copyWith(
-                          fontSize:
-                              screenWidth *
-                              (isLargeScreen
-                                  ? 0.012
-                                  : isTablet
-                                  ? 0.02
-                                  : 0.03),
-                          color: statusColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            SizedBox(height: screenWidth * 0.02),
-
-            // Location - Clickable with different styles based on availability
-            GestureDetector(
-              onTap: () => _openGoogleMaps(context),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.03,
-                  vertical: screenWidth * 0.02,
-                ),
-                decoration: BoxDecoration(
-                  color:
-                      hasValidLocation
-                          ? AppColors.primary.withOpacity(0.1)
-                          : Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color:
-                        hasValidLocation
-                            ? AppColors.primary.withOpacity(0.3)
-                            : Colors.grey.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      hasValidLocation ? Icons.location_on : Icons.location_off,
-                      size: screenWidth * 0.04,
-                      color: hasValidLocation ? AppColors.primary : Colors.grey,
-                    ),
-                    SizedBox(width: screenWidth * 0.02),
-                    Text(
-                      hasValidLocation
-                          ? "Your vehicle location"
-                          : "Location not available",
-                      style: AppFonts.regular14().copyWith(
-                        fontSize:
-                            screenWidth *
-                            (isLargeScreen
-                                ? 0.014
-                                : isTablet
-                                ? 0.022
-                                : 0.035),
-                        color:
-                            hasValidLocation ? AppColors.primary : Colors.grey,
-                        decoration:
-                            hasValidLocation
-                                ? TextDecoration.underline
-                                : TextDecoration.none,
-                        decorationColor: AppColors.primary,
-                      ),
-                    ),
-                    if (hasValidLocation) ...[
                       SizedBox(width: screenWidth * 0.02),
                       Icon(
                         Icons.open_in_new,
@@ -292,71 +244,201 @@ class ReportCard extends StatelessWidget {
                         color: AppColors.primary,
                       ),
                     ],
-                  ],
-                ),
-              ),
-            ),
-
-            SizedBox(height: screenWidth * 0.025),
-
-            // Message
-            Text(
-              message,
-              style: AppFonts.semiBold16().copyWith(
-                fontSize:
-                    screenWidth *
-                    (isLargeScreen
-                        ? 0.016
-                        : isTablet
-                        ? 0.025
-                        : 0.04),
-                color: AppColors.textPrimary,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-
-            SizedBox(height: screenWidth * 0.025),
-
-            // Reporter Row
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: screenWidth * 0.04,
-                  backgroundColor: AppColors.textSecondary.withOpacity(0.3),
-                  backgroundImage:
-                      profileImage != null ? AssetImage(profileImage!) : null,
-                  child:
-                      profileImage == null
-                          ? Icon(
-                            Icons.person,
-                            size: screenWidth * 0.04,
-                            color: AppColors.textSecondary,
-                          )
-                          : null,
-                ),
-                SizedBox(width: screenWidth * 0.025),
-                Flexible(
-                  child: Text(
-                    "Reported by $reporter",
-                    style: AppFonts.regular14().copyWith(
-                      fontSize:
-                          screenWidth *
-                          (isLargeScreen
-                              ? 0.012
-                              : isTablet
-                              ? 0.02
-                              : 0.032),
-                      color: AppColors.textSecondary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ],
+              ),
             ),
+
+          // Message
+          Text(
+            message,
+            style: AppFonts.semiBold16().copyWith(
+              fontSize:
+                  screenWidth *
+                  (isLargeScreen
+                      ? 0.016
+                      : isTablet
+                      ? 0.025
+                      : 0.04),
+              color: AppColors.textPrimary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+
+          SizedBox(height: screenWidth * 0.025),
+
+          // Images Section - With tap to view full image
+          if (hasImages == true && images != null && images!.isNotEmpty) ...[
+            Container(
+              height: screenHeight * 0.12,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: images!.length,
+                itemBuilder: (context, index) {
+                  final imageUrl = images![index];
+                  return Container(
+                    margin: EdgeInsets.only(right: screenWidth * 0.02),
+                    child: GestureDetector(
+                      onTap: () => _showFullImage(context, imageUrl),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          imageUrl,
+                          width: screenHeight * 0.12,
+                          height: screenHeight * 0.12,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: screenHeight * 0.12,
+                              height: screenHeight * 0.12,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Colors.grey,
+                                size: screenWidth * 0.06,
+                              ),
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: screenHeight * 0.12,
+                              height: screenHeight * 0.12,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  value:
+                                      loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress
+                                                  .cumulativeBytesLoaded /
+                                              loadingProgress
+                                                  .expectedTotalBytes!
+                                          : null,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: screenWidth * 0.025),
           ],
-        ),
+
+          // Reporter Row
+          Row(
+            children: [
+              CircleAvatar(
+                radius: screenWidth * 0.04,
+                backgroundColor: AppColors.textSecondary.withOpacity(0.3),
+                backgroundImage:
+                    profileImage != null ? NetworkImage(profileImage!) : null,
+                child:
+                    profileImage == null
+                        ? Icon(
+                          Icons.person,
+                          size: screenWidth * 0.04,
+                          color: AppColors.textSecondary,
+                        )
+                        : null,
+              ),
+              SizedBox(width: screenWidth * 0.025),
+              Flexible(
+                child: Text(
+                  "Reported by $reporter",
+                  style: AppFonts.regular14().copyWith(
+                    fontSize:
+                        screenWidth *
+                        (isLargeScreen
+                            ? 0.012
+                            : isTablet
+                            ? 0.02
+                            : 0.032),
+                    color: AppColors.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+
+  /// Show full screen image dialog
+  void _showFullImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          child: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.broken_image,
+                              color: Colors.white,
+                              size: 64,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Failed to load image',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          value:
+                              loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 40,
+                right: 20,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: Icon(Icons.close, color: Colors.white, size: 30),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

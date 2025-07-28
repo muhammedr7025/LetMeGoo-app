@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +10,7 @@ import 'package:letmegoo/models/vehicle.dart';
 import 'package:letmegoo/models/vehicle_type.dart';
 import 'package:letmegoo/models/vehicle_search_result.dart';
 import 'package:letmegoo/models/report_request.dart';
+import 'package:letmegoo/services/device_service.dart';
 import 'package:letmegoo/services/google_auth_service.dart';
 import 'package:http_parser/http_parser.dart';
 
@@ -280,71 +282,6 @@ class AuthService {
         rethrow;
       }
       throw ApiException('Failed to update privacy preference: $e');
-    }
-  }
-
-  static Future<void> logout(BuildContext context) async {
-    try {
-      // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (context) => const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF31C5F4)),
-              ),
-            ),
-      );
-
-      // Sign out from both Firebase and Google
-      await GoogleAuthService.signOut();
-
-      // Close loading dialog
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
-
-      // Navigate to login page and clear all previous routes
-      if (context.mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/login', // Replace with your login page route
-          (route) => false,
-        );
-      }
-    } catch (e) {
-      // Close loading dialog if still open
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
-
-      // Show error dialog
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('Logout Error'),
-                content: Text('Failed to logout: $e'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-        );
-      }
-    }
-  }
-
-  /// Alternative logout function that returns success/failure status
-  static Future<bool> logoutWithStatus() async {
-    try {
-      await GoogleAuthService.signOut();
-      return true;
-    } catch (e) {
-      return false;
     }
   }
 
@@ -837,18 +774,18 @@ class AuthService {
         }
       }
 
-      // Debug: Print request details
-      print('Request URL: ${multipartRequest.url}');
-      print('Request fields: ${multipartRequest.fields}');
-      print('Request files: ${multipartRequest.files.length}');
+      // // Debug: Print request details
+      // print('Request URL: ${multipartRequest.url}');
+      // print('Request fields: ${multipartRequest.fields}');
+      // print('Request files: ${multipartRequest.files.length}');
 
       final streamedResponse = await multipartRequest.send().timeout(
         timeoutDuration,
       );
       final response = await http.Response.fromStream(streamedResponse);
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      // print('Response status: ${response.statusCode}');
+      // print('Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body) as Map<String, dynamic>;
@@ -925,33 +862,33 @@ class AuthService {
 
   /// Get live reports by user
   static Future<List<Report>> getLiveReportsByUser() async {
-    print('🔴 Getting live reports BY user');
+    // print('🔴 Getting live reports BY user');
     final reports = await _getReports(isClosed: false, type: 'reported_by_me');
-    print('🔴 Live reports BY user: ${reports.length}');
+    // print('🔴 Live reports BY user: ${reports.length}');
     return reports;
   }
 
   /// Get live reports against user
   static Future<List<Report>> getLiveReportsAgainstUser() async {
-    print('🟠 Getting live reports AGAINST user');
+    // print('🟠 Getting live reports AGAINST user');
     final reports = await _getReports(isClosed: false, type: 'reported_to_me');
-    print('🟠 Live reports AGAINST user: ${reports.length}');
+    //print('🟠 Live reports AGAINST user: ${reports.length}');
     return reports;
   }
 
   /// Get solved reports by user
   static Future<List<Report>> getSolvedReportsByUser() async {
-    print('🟢 Getting solved reports BY user');
+    // print('🟢 Getting solved reports BY user');
     final reports = await _getReports(isClosed: true, type: 'reported_by_me');
-    print('🟢 Solved reports BY user: ${reports.length}');
+    // print('🟢 Solved reports BY user: ${reports.length}');
     return reports;
   }
 
   /// Get solved reports against user
   static Future<List<Report>> getSolvedReportsAgainstUser() async {
-    print('🟡 Getting solved reports AGAINST user');
+    //print('🟡 Getting solved reports AGAINST user');
     final reports = await _getReports(isClosed: true, type: 'reported_to_me');
-    print('🟡 Solved reports AGAINST user: ${reports.length}');
+    // print('🟡 Solved reports AGAINST user: ${reports.length}');
     return reports;
   }
 
@@ -1150,6 +1087,182 @@ class AuthService {
     } catch (e) {
       print('💥 DEBUG Error: $e');
       rethrow;
+    }
+  }
+
+  /// Complete logout process with API call
+  static Future<void> logout(BuildContext context) async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Step 1: Call logout API first
+      await _callLogoutAPI();
+
+      // Step 2: Unregister device from notifications
+      await DeviceService.unregisterDevice();
+
+      // Step 3: Sign out from Firebase and Google
+      await GoogleAuthService.signOut();
+
+      // Close loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // Navigate to login page and clear all previous routes
+      if (context.mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login', // Replace with your login page route
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      print('Logout error: $e');
+
+      // Close loading dialog if still open
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // Even if API call fails, still sign out locally
+      try {
+        await GoogleAuthService.signOut();
+
+        if (context.mounted) {
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/login', (route) => false);
+        }
+      } catch (localSignOutError) {
+        // Show error dialog only if local signout also fails
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder:
+                (context) => AlertDialog(
+                  title: const Text('Logout Error'),
+                  content: Text('Failed to logout: $localSignOutError'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+          );
+        }
+      }
+    }
+  }
+
+  /// Call the logout API
+  static Future<void> _callLogoutAPI() async {
+    try {
+      if (!await _hasInternetConnection()) {
+        throw ConnectivityException('No internet connection');
+      }
+
+      // Get Firebase user and token
+      final User? firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        print('No Firebase user found, skipping logout API call');
+        return; // Don't throw error, just skip API call
+      }
+
+      final String? idToken = await firebaseUser.getIdToken(true);
+      if (idToken == null) {
+        print('Failed to get ID token, skipping logout API call');
+        return; // Don't throw error, just skip API call
+      }
+
+      // Get device ID (using FCM token as device identifier)
+      final String? deviceId = await _getDeviceId();
+      if (deviceId == null) {
+        print('Failed to get device ID, skipping logout API call');
+        return; // Don't throw error, just skip API call
+      }
+
+      print(
+        '🚪 Calling logout API with device_id: ${deviceId.substring(0, 10)}...',
+      );
+
+      final response = await _httpClient
+          .post(
+            Uri.parse('$baseUrl/user/logout'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': 'Bearer $idToken',
+            },
+            body: 'device_id=$deviceId',
+          )
+          .timeout(timeoutDuration);
+
+      print('📤 Logout API response: ${response.statusCode}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('✅ Logout API call successful');
+      } else {
+        print(
+          '⚠️ Logout API returned: ${response.statusCode} - ${response.body}',
+        );
+        // Don't throw error - continue with local logout
+      }
+    } on TimeoutException {
+      print('⏰ Logout API timeout - continuing with local logout');
+      // Don't throw - continue with local logout
+    } on SocketException {
+      print(
+        '🌐 Network error during logout API - continuing with local logout',
+      );
+      // Don't throw - continue with local logout
+    } catch (e) {
+      print('❌ Logout API error: $e - continuing with local logout');
+      // Don't throw - continue with local logout
+    }
+  }
+
+  /// Get device ID (FCM token) for logout API
+  static Future<String?> _getDeviceId() async {
+    try {
+      final FirebaseMessaging messaging = FirebaseMessaging.instance;
+      final token = await messaging.getToken();
+      return token;
+    } catch (e) {
+      print('Error getting device ID: $e');
+      return null;
+    }
+  }
+
+  /// Alternative logout function that returns success/failure status
+  static Future<bool> logoutWithStatus() async {
+    try {
+      // Call logout API
+      await _callLogoutAPI();
+
+      // Unregister device
+      await DeviceService.unregisterDevice();
+
+      // Sign out locally
+      await GoogleAuthService.signOut();
+
+      return true;
+    } catch (e) {
+      print('Logout with status error: $e');
+
+      // Try local signout even if API fails
+      try {
+        await GoogleAuthService.signOut();
+        return true; // Consider it successful if local signout works
+      } catch (localError) {
+        print('Local signout also failed: $localError');
+        return false;
+      }
     }
   }
 

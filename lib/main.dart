@@ -1,3 +1,5 @@
+// lib/main.dart - Updated with navigator key for notifications
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,10 +34,18 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // Create a global navigator key for notification navigation
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
+    // Set the navigator key in NotificationService
+    NotificationService.setNavigatorKey(navigatorKey);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey, // Add this line
       home: const SplashScreen(),
       routes: {
         '/splash': (context) => const SplashScreen(),
