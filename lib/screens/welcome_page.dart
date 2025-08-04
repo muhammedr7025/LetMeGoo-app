@@ -95,16 +95,16 @@ class _WelcomePageState extends State<WelcomePage>
     // Check provider data to determine login method
     for (UserInfo provider in user.providerData) {
       switch (provider.providerId) {
-        case 'phone':
-          return LoginMethod.phone;
+        case 'password':
+          return LoginMethod.email;
         case 'google.com':
           return LoginMethod.google;
       }
     }
 
-    // Fallback: check if phone number exists
-    if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty) {
-      return LoginMethod.phone;
+    // Fallback: check if email exists (likely email auth)
+    if (user.email != null && user.email!.isNotEmpty) {
+      return LoginMethod.email;
     }
 
     // Check if signed in with Google (alternative check)
@@ -171,218 +171,296 @@ class _WelcomePageState extends State<WelcomePage>
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final isTablet = screenWidth > 600;
-    final isLargeScreen = screenWidth > 900;
+
+    // Responsive breakpoints
+    final bool isLargeScreen = screenWidth > 1200;
+    final bool isTablet = screenWidth > 600 && screenWidth <= 1200;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Top spacing
-              SizedBox(height: screenHeight * 0.05),
-
-              // Text Content - Appears after lock settles
-              Container(
-                constraints: BoxConstraints(
-                  maxWidth:
-                      isLargeScreen
-                          ? 600
-                          : isTablet
-                          ? 500
-                          : double.infinity,
-                ),
-                child:
-                    _showText
-                        ? SlideTransition(
-                          position: _textSlide,
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Animated Lock Icon
+                    AnimatedBuilder(
+                      animation: _lockController,
+                      builder: (context, child) {
+                        return SlideTransition(
+                          position: _lockSlide,
                           child: FadeTransition(
-                            opacity: _textFade,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Welcome to Let Me Go 👋',
-                                  style: AppFonts.semiBold24().copyWith(
-                                    fontSize:
-                                        screenWidth *
-                                        (isLargeScreen
-                                            ? 0.028
-                                            : isTablet
-                                            ? 0.04
-                                            : 0.065),
+                            opacity: _lockFade,
+                            child: ScaleTransition(
+                              scale: _lockScale,
+                              child: Container(
+                                width:
+                                    screenWidth *
+                                    (isLargeScreen
+                                        ? 0.12
+                                        : isTablet
+                                        ? 0.2
+                                        : 0.3),
+                                height:
+                                    screenWidth *
+                                    (isLargeScreen
+                                        ? 0.12
+                                        : isTablet
+                                        ? 0.2
+                                        : 0.3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(25),
+                                  border: Border.all(
+                                    color: AppColors.primary.withOpacity(0.2),
+                                    width: 2,
                                   ),
                                 ),
-
-                                SizedBox(height: screenHeight * 0.02),
-
-                                Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: "You're just a ",
-                                        style: AppFonts.regular16().copyWith(
-                                          fontSize:
-                                              screenWidth *
-                                              (isLargeScreen
-                                                  ? 0.018
-                                                  : isTablet
-                                                  ? 0.028
-                                                  : 0.045),
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: "few steps",
-                                        style: AppFonts.semiBold16().copyWith(
-                                          fontSize:
-                                              screenWidth *
-                                              (isLargeScreen
-                                                  ? 0.018
-                                                  : isTablet
-                                                  ? 0.028
-                                                  : 0.045),
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: " away from getting started.",
-                                        style: AppFonts.regular16().copyWith(
-                                          fontSize:
-                                              screenWidth *
-                                              (isLargeScreen
-                                                  ? 0.018
-                                                  : isTablet
-                                                  ? 0.028
-                                                  : 0.045),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                child: Icon(
+                                  Icons.lock_outline,
+                                  size:
+                                      screenWidth *
+                                      (isLargeScreen
+                                          ? 0.06
+                                          : isTablet
+                                          ? 0.1
+                                          : 0.15),
+                                  color: AppColors.primary,
                                 ),
-
-                                SizedBox(height: screenHeight * 0.01),
-
-                                Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: "As a ",
-                                        style: AppFonts.regular16().copyWith(
-                                          fontSize:
-                                              screenWidth *
-                                              (isLargeScreen
-                                                  ? 0.018
-                                                  : isTablet
-                                                  ? 0.028
-                                                  : 0.045),
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: "new user",
-                                        style: AppFonts.semiBold16().copyWith(
-                                          fontStyle: FontStyle.italic,
-                                          fontSize:
-                                              screenWidth *
-                                              (isLargeScreen
-                                                  ? 0.018
-                                                  : isTablet
-                                                  ? 0.028
-                                                  : 0.045),
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: ", we need a few ",
-                                        style: AppFonts.regular16().copyWith(
-                                          fontSize:
-                                              screenWidth *
-                                              (isLargeScreen
-                                                  ? 0.018
-                                                  : isTablet
-                                                  ? 0.028
-                                                  : 0.045),
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: "basic details",
-                                        style: AppFonts.regular16().copyWith(
-                                          color: AppColors.primary,
-                                          fontSize:
-                                              screenWidth *
-                                              (isLargeScreen
-                                                  ? 0.018
-                                                  : isTablet
-                                                  ? 0.028
-                                                  : 0.045),
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: " to set things up.",
-                                        style: AppFonts.regular16().copyWith(
-                                          fontSize:
-                                              screenWidth *
-                                              (isLargeScreen
-                                                  ? 0.018
-                                                  : isTablet
-                                                  ? 0.028
-                                                  : 0.045),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        )
-                        : SizedBox(height: screenHeight * 0.15),
-              ),
+                        );
+                      },
+                    ),
 
-              SizedBox(height: screenHeight * 0.08),
+                    SizedBox(height: screenHeight * 0.06),
 
-              // Lock Image - Single smooth animation
-              Center(
-                child: AnimatedBuilder(
-                  animation: _lockController,
-                  builder: (context, child) {
-                    return SlideTransition(
-                      position: _lockSlide,
-                      child: FadeTransition(
-                        opacity: _lockFade,
-                        child: ScaleTransition(
-                          scale: _lockScale,
-                          child: Image.asset(
-                            AppImages.lock,
-                            width:
-                                screenWidth *
-                                (isLargeScreen
-                                    ? 0.2
-                                    : isTablet
-                                    ? 0.25
-                                    : 0.45),
-                            height:
-                                screenWidth *
-                                (isLargeScreen
-                                    ? 0.2
-                                    : isTablet
-                                    ? 0.25
-                                    : 0.45),
-                            fit: BoxFit.contain,
-                          ),
-                        ),
+                    // Animated Text Content
+                    if (_showText)
+                      AnimatedBuilder(
+                        animation: _textController,
+                        builder: (context, child) {
+                          return SlideTransition(
+                            position: _textSlide,
+                            child: FadeTransition(
+                              opacity: _textFade,
+                              child: Column(
+                                children: [
+                                  // Welcome Title
+                                  Text(
+                                    "Welcome to LetMeGoo!",
+                                    style: AppFonts.bold13(
+                                      color: AppColors.primary,
+                                    ).copyWith(
+                                      fontSize:
+                                          screenWidth *
+                                          (isLargeScreen
+                                              ? 0.025
+                                              : isTablet
+                                              ? 0.035
+                                              : 0.055),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+
+                                  SizedBox(height: screenHeight * 0.02),
+
+                                  // Subtitle
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: screenWidth * 0.1,
+                                    ),
+                                    child: Text(
+                                      "Let's set up your profile to get started with your smart vehicle assistant",
+                                      style: AppFonts.regular16(
+                                        color: AppColors.textSecondary,
+                                      ).copyWith(
+                                        fontSize:
+                                            screenWidth *
+                                            (isLargeScreen
+                                                ? 0.016
+                                                : isTablet
+                                                ? 0.025
+                                                : 0.04),
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+
+                                  SizedBox(height: screenHeight * 0.04),
+
+                                  // Features List
+                                  Container(
+                                    width:
+                                        screenWidth *
+                                        (isLargeScreen
+                                            ? 0.4
+                                            : isTablet
+                                            ? 0.6
+                                            : 0.8),
+                                    child: Column(
+                                      children: [
+                                        _buildFeatureItem(
+                                          Icons.security,
+                                          "Secure Authentication",
+                                          "Your account is protected",
+                                          screenWidth,
+                                          isLargeScreen,
+                                          isTablet,
+                                        ),
+                                        SizedBox(height: screenHeight * 0.02),
+                                        _buildFeatureItem(
+                                          Icons.directions_car,
+                                          "Vehicle Management",
+                                          "Track and manage your vehicles",
+                                          screenWidth,
+                                          isLargeScreen,
+                                          isTablet,
+                                        ),
+                                        SizedBox(height: screenHeight * 0.02),
+                                        _buildFeatureItem(
+                                          Icons.notifications_active,
+                                          "Smart Alerts",
+                                          "Get notified about important updates",
+                                          screenWidth,
+                                          isLargeScreen,
+                                          isTablet,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
+                  ],
                 ),
               ),
+            ),
 
-              // Bottom spacing
-              SizedBox(height: screenHeight * 0.1),
+            // Loading indicator at bottom
+            Padding(
+              padding: EdgeInsets.only(bottom: screenHeight * 0.08),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+                  Text(
+                    "Setting up your profile...",
+                    style: AppFonts.regular14(
+                      color: AppColors.textSecondary,
+                    ).copyWith(
+                      fontSize:
+                          screenWidth *
+                          (isLargeScreen
+                              ? 0.014
+                              : isTablet
+                              ? 0.025
+                              : 0.035),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem(
+    IconData icon,
+    String title,
+    String description,
+    double screenWidth,
+    bool isLargeScreen,
+    bool isTablet,
+  ) {
+    return Row(
+      children: [
+        Container(
+          width:
+              screenWidth *
+              (isLargeScreen
+                  ? 0.03
+                  : isTablet
+                  ? 0.05
+                  : 0.08),
+          height:
+              screenWidth *
+              (isLargeScreen
+                  ? 0.03
+                  : isTablet
+                  ? 0.05
+                  : 0.08),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: AppColors.primary,
+            size:
+                screenWidth *
+                (isLargeScreen
+                    ? 0.015
+                    : isTablet
+                    ? 0.025
+                    : 0.04),
+          ),
+        ),
+        SizedBox(width: screenWidth * 0.04),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppFonts.semiBold14(
+                  color: AppColors.textPrimary,
+                ).copyWith(
+                  fontSize:
+                      screenWidth *
+                      (isLargeScreen
+                          ? 0.014
+                          : isTablet
+                          ? 0.025
+                          : 0.035),
+                ),
+              ),
+              Text(
+                description,
+                style: AppFonts.regular13(
+                  color: AppColors.textSecondary,
+                ).copyWith(
+                  fontSize:
+                      screenWidth *
+                      (isLargeScreen
+                          ? 0.012
+                          : isTablet
+                          ? 0.02
+                          : 0.03),
+                ),
+              ),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }

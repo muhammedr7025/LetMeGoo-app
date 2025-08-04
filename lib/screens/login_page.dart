@@ -3,13 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:letmegoo/constants/app_images.dart';
 import 'package:letmegoo/constants/app_theme.dart';
 import 'package:letmegoo/models/user_model.dart';
-import 'package:letmegoo/screens/phone_number_page.dart';
 import 'package:letmegoo/screens/user_detail_reg_page.dart';
 import 'package:letmegoo/screens/welcome_page.dart';
 import 'package:letmegoo/widgets/main_app.dart';
 import 'package:letmegoo/widgets/commonbutton.dart';
-import 'package:letmegoo/widgets/loginactionrow.dart';
 import 'package:letmegoo/services/google_auth_service.dart';
+import 'package:letmegoo/services/email_auth_service.dart';
 import 'package:letmegoo/services/auth_service.dart';
 import 'package:letmegoo/models/login_method.dart';
 
@@ -22,6 +21,23 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _isGoogleLoading = false;
+  bool _isEmailLoading = false;
+  bool _isSignUp = false; // Toggle between sign in and sign up
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleGoogleSignIn() async {
     setState(() {
@@ -85,6 +101,157 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _handleEmailAuth() async {
+    if (!_validateEmailForm()) return;
+
+    setState(() {
+      _isEmailLoading = true;
+    });
+
+    try {
+      UserCredential? userCredential;
+
+      if (_isSignUp) {
+        // Sign up with email and password
+        userCredential = await EmailAuthService.signUpWithEmail(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+
+        if (userCredential != null) {
+          _showSnackBar('Account created successfully!', isError: false);
+          // Send email verification
+          await EmailAuthService.sendEmailVerification();
+          _showSnackBar(
+            'Verification email sent. Please check your inbox.',
+            isError: false,
+          );
+        }
+      } else {
+        // Sign in with email and password
+        userCredential = await EmailAuthService.signInWithEmail(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+
+        if (userCredential != null) {
+          _showSnackBar('Email sign-in successful!', isError: false);
+        }
+      }
+
+      if (userCredential == null) {
+        _showSnackBar(
+          _isSignUp ? 'Failed to create account' : 'Failed to sign in',
+          isError: true,
+        );
+        return;
+      }
+
+      // Check if user profile is complete via API
+      try {
+        final userData = await AuthService.authenticateUser();
+
+        if (userData != null) {
+          // Parse user data using UserModel (same as splash screen)
+          final UserModel userModel = UserModel.fromJson(userData);
+
+          // Apply the same validation logic as splash screen
+          if (userModel.fullname != "Unknown User" &&
+              userModel.phoneNumber != null) {
+            // User has complete profile, navigate to main app
+            _navigateToMainApp();
+          } else {
+            // User needs to complete profile, navigate to user details
+            _navigateToUserDetails();
+          }
+        } else {
+          // User doesn't exist in backend, navigate to welcome/user details
+          _navigateToWelcome();
+        }
+      } catch (e) {
+        // API call failed, but email login succeeded
+        // Navigate to welcome page to complete setup
+        _navigateToWelcome();
+      }
+    } on FirebaseAuthException catch (e) {
+      _showSnackBar(EmailAuthService.getErrorMessage(e), isError: true);
+    } catch (e) {
+      _showSnackBar(
+        '${_isSignUp ? 'Sign up' : 'Sign in'} failed: ${e.toString()}',
+        isError: true,
+      );
+    } finally {
+      setState(() {
+        _isEmailLoading = false;
+      });
+    }
+  }
+
+  bool _validateEmailForm() {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty) {
+      _showSnackBar('Please enter your email address', isError: true);
+      return false;
+    }
+
+    if (!EmailAuthService.isValidEmail(email)) {
+      _showSnackBar('Please enter a valid email address', isError: true);
+      return false;
+    }
+
+    if (password.isEmpty) {
+      _showSnackBar('Please enter your password', isError: true);
+      return false;
+    }
+
+    if (!EmailAuthService.isValidPassword(password)) {
+      _showSnackBar(EmailAuthService.getPasswordRequirements(), isError: true);
+      return false;
+    }
+
+    if (_isSignUp) {
+      final confirmPassword = _confirmPasswordController.text;
+      if (confirmPassword.isEmpty) {
+        _showSnackBar('Please confirm your password', isError: true);
+        return false;
+      }
+
+      if (password != confirmPassword) {
+        _showSnackBar('Passwords do not match', isError: true);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      _showSnackBar('Please enter your email address', isError: true);
+      return;
+    }
+
+    if (!EmailAuthService.isValidEmail(email)) {
+      _showSnackBar('Please enter a valid email address', isError: true);
+      return;
+    }
+
+    final success = await EmailAuthService.sendPasswordResetEmail(email);
+
+    if (success) {
+      _showSnackBar(
+        'Password reset email sent. Please check your inbox.',
+        isError: false,
+      );
+    } else {
+      _showSnackBar('Failed to send password reset email', isError: true);
+    }
+  }
+
   void _handleFirebaseError(FirebaseAuthException e) {
     String errorMessage;
     switch (e.code) {
@@ -107,12 +274,22 @@ class _LoginPageState extends State<LoginPage> {
         errorMessage = 'Incorrect password';
         break;
       case 'too-many-requests':
-        errorMessage = 'Too many attempts. Please try again later';
+        errorMessage = 'Too many attempts. Please try again later.';
         break;
       default:
-        errorMessage = 'Sign-in failed: ${e.message}';
+        errorMessage = e.message ?? 'An unknown error occurred';
     }
     _showSnackBar(errorMessage, isError: true);
+  }
+
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   void _navigateToMainApp() {
@@ -121,232 +298,285 @@ class _LoginPageState extends State<LoginPage> {
     ).pushReplacement(MaterialPageRoute(builder: (_) => const MainApp()));
   }
 
+  void _navigateToUserDetails() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder:
+            (_) => const UserDetailRegPage(loginMethod: LoginMethod.google),
+      ),
+    );
+  }
+
   void _navigateToWelcome() {
     Navigator.of(
       context,
     ).pushReplacement(MaterialPageRoute(builder: (_) => const WelcomePage()));
   }
 
-  void _navigateToUserDetails() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => UserDetailRegPage(loginMethod: LoginMethod.google),
-      ),
-    );
-  }
-
-  void _showSnackBar(String message, {required bool isError}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? AppColors.darkRed : AppColors.darkGreen,
-        duration: Duration(seconds: isError ? 4 : 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final isTablet = screenWidth > 600;
-    final isLargeScreen = screenWidth > 900;
+
+    // Responsive breakpoints
+    final bool isLargeScreen = screenWidth > 1200;
+    final bool isTablet = screenWidth > 600 && screenWidth <= 1200;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: screenWidth * 0.05, // 5% padding on sides
-            ),
+            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
             child: Column(
               children: [
-                // Logo Container
+                SizedBox(height: screenHeight * 0.08),
+
+                // Logo
                 Container(
-                  height: screenHeight * (isTablet ? 0.25 : 0.28),
-                  alignment: Alignment.center,
+                  width:
+                      screenWidth *
+                      (isLargeScreen
+                          ? 0.15
+                          : isTablet
+                          ? 0.25
+                          : 0.4),
+                  height:
+                      screenWidth *
+                      (isLargeScreen
+                          ? 0.15
+                          : isTablet
+                          ? 0.25
+                          : 0.4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    image: const DecorationImage(
+                      image: AssetImage(AppImages.logo),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: screenHeight * 0.04),
+
+                // Title
+                Text(
+                  _isSignUp ? "Create Account" : "Welcome Back!",
+                  style: AppFonts.bold13(color: AppColors.primary).copyWith(
+                    fontSize:
+                        screenWidth *
+                        (isLargeScreen
+                            ? 0.025
+                            : isTablet
+                            ? 0.035
+                            : 0.055),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                SizedBox(height: screenHeight * 0.015),
+
+                // Subtitle
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
+                  child: Text(
+                    _isSignUp
+                        ? "Create your account to get started"
+                        : "Sign in to your account to continue",
+                    style: AppFonts.regular13(
+                      color: AppColors.textSecondary,
+                    ).copyWith(
+                      fontSize:
+                          screenWidth *
+                          (isLargeScreen
+                              ? 0.014
+                              : isTablet
+                              ? 0.025
+                              : 0.035),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+
+                SizedBox(height: screenHeight * 0.04),
+
+                // Email Form
+                Container(
+                  width:
+                      screenWidth *
+                      (isLargeScreen
+                          ? 0.4
+                          : isTablet
+                          ? 0.6
+                          : 0.9),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // Email Input
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        enabled: !_isEmailLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Email Address',
+                          hintText: 'Enter your email',
+                          prefixIcon: const Icon(Icons.email_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                      ),
+
                       SizedBox(height: screenHeight * 0.02),
-                      Image.asset(
-                        AppImages.lock,
-                        width:
-                            screenWidth *
-                            (isLargeScreen
-                                ? 0.15
-                                : isTablet
-                                ? 0.2
-                                : 0.35),
-                        height:
-                            screenWidth *
-                            (isLargeScreen
-                                ? 0.15
-                                : isTablet
-                                ? 0.2
-                                : 0.35),
-                        fit: BoxFit.contain,
-                      ),
-                    ],
-                  ),
-                ),
 
-                // Title Section
-                Container(
-                  constraints: BoxConstraints(
-                    maxWidth: isLargeScreen ? 600 : double.infinity,
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        "Blocked by a carelessly parked",
-                        style: AppFonts.semiBold24().copyWith(
-                          fontSize:
-                              screenWidth *
-                              (isLargeScreen
-                                  ? 0.025
-                                  : isTablet
-                                  ? 0.035
-                                  : 0.055),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      Text(
-                        "vehicle? We're here to help.",
-                        style: AppFonts.semiBold24().copyWith(
-                          fontSize:
-                              screenWidth *
-                              (isLargeScreen
-                                  ? 0.025
-                                  : isTablet
-                                  ? 0.035
-                                  : 0.055),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: screenHeight * 0.025),
-
-                // Subtitle Section
-                Container(
-                  constraints: BoxConstraints(
-                    maxWidth: isLargeScreen ? 500 : double.infinity,
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        "Don't let bad parking ruin your day.",
-                        style: AppFonts.regular13(
-                          color: AppColors.textSecondary,
-                        ).copyWith(
-                          fontSize:
-                              screenWidth *
-                              (isLargeScreen
-                                  ? 0.014
-                                  : isTablet
-                                  ? 0.025
-                                  : 0.035),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      Text(
-                        "Let's fix it fast.",
-                        style: AppFonts.regular13(
-                          color: AppColors.textSecondary,
-                        ).copyWith(
-                          fontSize:
-                              screenWidth *
-                              (isLargeScreen
-                                  ? 0.014
-                                  : isTablet
-                                  ? 0.025
-                                  : 0.035),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: screenHeight * 0.035),
-
-                // Action buttons - Make them responsive
-                Container(
-                  constraints: BoxConstraints(
-                    maxWidth:
-                        isLargeScreen
-                            ? 500
-                            : isTablet
-                            ? 400
-                            : double.infinity,
-                  ),
-                  child: const Column(
-                    children: [
-                      LoginActionRow(
-                        icon: Icons.camera_alt_outlined,
-                        label: "Find owner",
-                        color: Color(0xFF31C5F4),
-                        showConnector: true,
-                      ),
-                      LoginActionRow(
-                        icon: Icons.alarm,
-                        label: "Report in one minute",
-                        color: Color(0xFF31C5F4),
-                        showConnector: true,
-                      ),
-                      LoginActionRow(
-                        icon: Icons.notifications_active_outlined,
-                        label: "Get help & save time!",
-                        color: Color(0xFF31C5F4),
-                      ),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: screenHeight * 0.05),
-
-                // Buttons Container
-                Container(
-                  constraints: BoxConstraints(
-                    maxWidth:
-                        isLargeScreen
-                            ? 400
-                            : isTablet
-                            ? 350
-                            : double.infinity,
-                  ),
-                  child: Column(
-                    children: [
-                      // Phone Number Login Button
-                      CommonButton(
-                        text: "Login With Phone Number",
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const PhoneNumberPage(),
+                      // Password Input
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        enabled: !_isEmailLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          hintText: 'Enter your password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
                             ),
-                          );
-                        },
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                      ),
+
+                      // Confirm Password (only for sign up)
+                      if (_isSignUp) ...[
+                        SizedBox(height: screenHeight * 0.02),
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          obscureText: _obscureConfirmPassword,
+                          enabled: !_isEmailLoading,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm Password',
+                            hintText: 'Confirm your password',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureConfirmPassword =
+                                      !_obscureConfirmPassword;
+                                });
+                              },
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                      ],
+
+                      SizedBox(height: screenHeight * 0.01),
+
+                      // Forgot Password (only for sign in)
+                      if (!_isSignUp)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _handleForgotPassword,
+                            child: Text(
+                              'Forgot Password?',
+                              style: AppFonts.regular13(
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      SizedBox(height: screenHeight * 0.02),
+
+                      // Email Auth Button
+                      CommonButton(
+                        text: _isSignUp ? "Create Account" : "Sign In",
+                        onTap: () => _handleEmailAuth(),
+                        isLoading: _isEmailLoading,
+                        isEnabled: !_isEmailLoading,
                       ),
 
                       SizedBox(height: screenHeight * 0.02),
 
-                      // Google Login Button - Enhanced with loading state
+                      // Toggle Sign In/Sign Up
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _isSignUp
+                                ? "Already have an account? "
+                                : "Don't have an account? ",
+                            style: AppFonts.regular13(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isSignUp = !_isSignUp;
+                                // Clear form when switching
+                                _emailController.clear();
+                                _passwordController.clear();
+                                _confirmPasswordController.clear();
+                              });
+                            },
+                            child: Text(
+                              _isSignUp ? "Sign In" : "Sign Up",
+                              style: AppFonts.bold16(color: AppColors.primary),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: screenHeight * 0.03),
+
+                      // Divider
+                      Row(
+                        children: [
+                          const Expanded(child: Divider()),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              'OR',
+                              style: AppFonts.regular13(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const Expanded(child: Divider()),
+                        ],
+                      ),
+
+                      SizedBox(height: screenHeight * 0.02),
+
+                      // Google Login Button
                       GestureDetector(
                         onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
                         child: Container(
-                          width:
-                              screenWidth *
-                              (isLargeScreen
-                                  ? 0.4
-                                  : isTablet
-                                  ? 0.6
-                                  : 0.85),
+                          width: double.infinity,
                           height: screenHeight * 0.07,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
@@ -367,68 +597,37 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               if (_isGoogleLoading) ...[
                                 SizedBox(
-                                  width:
-                                      screenWidth *
-                                      (isLargeScreen
-                                          ? 0.02
-                                          : isTablet
-                                          ? 0.04
-                                          : 0.06),
-                                  height:
-                                      screenWidth *
-                                      (isLargeScreen
-                                          ? 0.02
-                                          : isTablet
-                                          ? 0.04
-                                          : 0.06),
+                                  width: 24,
+                                  height: 24,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.primary,
+                                      AppColors.textSecondary,
                                     ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  "Signing in with Google...",
+                                  style: AppFonts.semiBold14(
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               ] else ...[
                                 Image.asset(
-                                  AppImages.googleLogo,
-                                  width:
-                                      screenWidth *
-                                      (isLargeScreen
-                                          ? 0.02
-                                          : isTablet
-                                          ? 0.04
-                                          : 0.06),
-                                  height:
-                                      screenWidth *
-                                      (isLargeScreen
-                                          ? 0.02
-                                          : isTablet
-                                          ? 0.04
-                                          : 0.06),
+                                  AppImages
+                                      .googleLogo, // Add Google icon to assets
+                                  width: 24,
+                                  height: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  "Continue with Google",
+                                  style: AppFonts.semiBold14(
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ],
-                              SizedBox(width: screenWidth * 0.025),
-                              Text(
-                                _isGoogleLoading
-                                    ? "Signing in..."
-                                    : "Login With Google",
-                                style: TextStyle(
-                                  fontSize:
-                                      screenWidth *
-                                      (isLargeScreen
-                                          ? 0.016
-                                          : isTablet
-                                          ? 0.025
-                                          : 0.04),
-                                  color:
-                                      _isGoogleLoading
-                                          ? AppColors.textSecondary.withOpacity(
-                                            0.7,
-                                          )
-                                          : AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -437,7 +636,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
 
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: screenHeight * 0.05),
               ],
             ),
           ),

@@ -25,7 +25,6 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
   final TextEditingController _emailController = TextEditingController();
 
   LoginMethod _currentLoginMethod = LoginMethod.unknown;
-  bool _isPhoneReadOnly = false;
   bool _isEmailReadOnly = false;
 
   @override
@@ -42,16 +41,10 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
       _currentLoginMethod = _determineLoginMethod(user);
 
       // Pre-fill fields based on login method
-      if (_currentLoginMethod == LoginMethod.phone &&
-          user.phoneNumber != null) {
-        // Remove +91 country code if present for display
-        String phoneNumber = user.phoneNumber!;
-        if (phoneNumber.startsWith('+91')) {
-          phoneNumber = phoneNumber.substring(3);
-        }
-        _phoneController.text = phoneNumber;
-        _isPhoneReadOnly = true;
-      } else if (_currentLoginMethod == LoginMethod.google &&
+      if (_currentLoginMethod == LoginMethod.google && user.email != null) {
+        _emailController.text = user.email!;
+        _isEmailReadOnly = true;
+      } else if (_currentLoginMethod == LoginMethod.email &&
           user.email != null) {
         _emailController.text = user.email!;
         _isEmailReadOnly = true;
@@ -73,16 +66,16 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
     // Check provider data to determine login method
     for (UserInfo provider in user.providerData) {
       switch (provider.providerId) {
-        case 'phone':
-          return LoginMethod.phone;
+        case 'password':
+          return LoginMethod.email;
         case 'google.com':
           return LoginMethod.google;
       }
     }
 
-    // Fallback: check if phone number exists
-    if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty) {
-      return LoginMethod.phone;
+    // Fallback: check if email exists (likely email auth)
+    if (user.email != null && user.email!.isNotEmpty) {
+      return LoginMethod.email;
     }
 
     return LoginMethod.unknown;
@@ -99,6 +92,12 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
         email.isNotEmpty &&
         _isValidEmail(email) &&
         checkboxValue;
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    ).hasMatch(email);
   }
 
   Future<void> _updateUserProfile() async {
@@ -151,10 +150,10 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
       if (result != null) {
         _showSnackBar("Profile updated successfully!", isError: false);
 
-        // Navigate to add vehicle page
+        // Navigate to next screen (Add Vehicle Page)
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AddVehiclePage()),
+          MaterialPageRoute(builder: (context) => const AddVehiclePage()),
         );
       } else {
         _showSnackBar(
@@ -163,7 +162,7 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
         );
       }
     } catch (e) {
-      _showSnackBar("Error: ${e.toString()}", isError: true);
+      _showSnackBar("Error updating profile: ${e.toString()}", isError: true);
     } finally {
       setState(() {
         _isLoading = false;
@@ -171,16 +170,274 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
     }
   }
 
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
-  }
-
   void _showSnackBar(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? AppColors.darkRed : AppColors.darkGreen,
-        duration: Duration(seconds: isError ? 4 : 2),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // Responsive breakpoints
+    final bool isLargeScreen = screenWidth > 1200;
+    final bool isTablet = screenWidth > 600 && screenWidth <= 1200;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
+            child: Column(
+              children: [
+                SizedBox(height: screenHeight * 0.05),
+
+                // Back button
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+
+                SizedBox(height: screenHeight * 0.02),
+
+                // Logo
+                Container(
+                  width:
+                      screenWidth *
+                      (isLargeScreen
+                          ? 0.1
+                          : isTablet
+                          ? 0.15
+                          : 0.25),
+                  height:
+                      screenWidth *
+                      (isLargeScreen
+                          ? 0.1
+                          : isTablet
+                          ? 0.15
+                          : 0.25),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    image: const DecorationImage(
+                      image: AssetImage(AppImages.logo),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: screenHeight * 0.03),
+
+                // Title
+                Text(
+                  "Complete Your Profile",
+                  style: AppFonts.bold13(color: AppColors.primary).copyWith(
+                    fontSize:
+                        screenWidth *
+                        (isLargeScreen
+                            ? 0.025
+                            : isTablet
+                            ? 0.035
+                            : 0.055),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                SizedBox(height: screenHeight * 0.015),
+
+                // Subtitle
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
+                  child: Text(
+                    "Please provide your details to complete your profile",
+                    style: AppFonts.regular13(
+                      color: AppColors.textSecondary,
+                    ).copyWith(
+                      fontSize:
+                          screenWidth *
+                          (isLargeScreen
+                              ? 0.014
+                              : isTablet
+                              ? 0.025
+                              : 0.035),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+
+                SizedBox(height: screenHeight * 0.04),
+
+                // Form Fields
+                Container(
+                  width:
+                      screenWidth *
+                      (isLargeScreen
+                          ? 0.4
+                          : isTablet
+                          ? 0.6
+                          : 0.9),
+                  child: Column(
+                    children: [
+                      // Full Name Input
+                      TextFormField(
+                        controller: _nameController,
+                        enabled: !_isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Full Name',
+                          hintText: 'Enter your full name',
+                          prefixIcon: const Icon(Icons.person_outline),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                      ),
+
+                      SizedBox(height: screenHeight * 0.02),
+
+                      // Email Input
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        enabled: !_isLoading && !_isEmailReadOnly,
+                        decoration: InputDecoration(
+                          labelText: 'Email Address',
+                          hintText: 'Enter your email',
+                          prefixIcon: const Icon(Icons.email_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor:
+                              _isEmailReadOnly
+                                  ? Colors.grey[200]
+                                  : Colors.white,
+                          suffixIcon:
+                              _isEmailReadOnly
+                                  ? const Icon(Icons.lock_outline, size: 16)
+                                  : null,
+                        ),
+                      ),
+
+                      SizedBox(height: screenHeight * 0.02),
+
+                      // Phone Number Input
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        enabled: !_isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number',
+                          hintText: 'Enter 10-digit phone number',
+                          prefixIcon: const Icon(Icons.phone_outlined),
+                          prefixText: '+91 ',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          counterText: '', // Hide character counter
+                        ),
+                      ),
+
+                      SizedBox(height: screenHeight * 0.03),
+
+                      // Permissions Checkbox
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Checkbox(
+                            value: checkboxValue,
+                            onChanged:
+                                _isLoading
+                                    ? null
+                                    : (value) {
+                                      setState(() {
+                                        checkboxValue = value ?? false;
+                                      });
+                                    },
+                            activeColor: AppColors.primary,
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Text(
+                                "I agree to the Terms of Service and Privacy Policy. I also consent to receive notifications and updates.",
+                                style: AppFonts.regular13(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: screenHeight * 0.04),
+
+                      // Continue Button
+                      CommonButton(
+                        text: "Continue",
+                        onTap: () => _updateUserProfile(),
+                        isLoading: _isLoading,
+                        isEnabled: !_isLoading,
+                      ),
+
+                      SizedBox(height: screenHeight * 0.02),
+
+                      // Login Method Indicator
+                      if (_currentLoginMethod != LoginMethod.unknown)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _currentLoginMethod == LoginMethod.google
+                                    ? Icons.g_mobiledata
+                                    : Icons.email_outlined,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Signed in with ${_currentLoginMethod.displayName}',
+                                style: AppFonts.regular13(
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: screenHeight * 0.05),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -191,380 +448,5 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
     _phoneController.dispose();
     _emailController.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isTablet = screenWidth > 600;
-    final isLargeScreen = screenWidth > 900;
-
-    // Check if all fields are valid for button state
-    bool areFieldsValid = _areAllFieldsValid();
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Scrollable content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.05,
-                  vertical: screenHeight * 0.02,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(height: screenHeight * 0.02),
-
-                    // Lock Image - Responsive
-                    Image.asset(
-                      AppImages.lock,
-                      height:
-                          screenWidth *
-                          (isLargeScreen
-                              ? 0.15
-                              : isTablet
-                              ? 0.2
-                              : 0.35),
-                      width:
-                          screenWidth *
-                          (isLargeScreen
-                              ? 0.15
-                              : isTablet
-                              ? 0.2
-                              : 0.35),
-                      fit: BoxFit.contain,
-                    ),
-
-                    SizedBox(height: screenHeight * 0.015),
-
-                    // Title - Responsive
-                    Text(
-                      'Enter Your Details',
-                      style: AppFonts.bold24().copyWith(
-                        fontSize:
-                            screenWidth *
-                            (isLargeScreen
-                                ? 0.025
-                                : isTablet
-                                ? 0.035
-                                : 0.055),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    SizedBox(height: screenHeight * 0.02),
-
-                    // Subtitle
-                    Text(
-                      'All fields are required to continue',
-                      style: AppFonts.regular14().copyWith(
-                        fontSize:
-                            screenWidth *
-                            (isLargeScreen
-                                ? 0.014
-                                : isTablet
-                                ? 0.025
-                                : 0.035),
-                        color: AppColors.textSecondary,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    SizedBox(height: screenHeight * 0.04),
-
-                    // Form Container - Responsive width
-                    Container(
-                      constraints: BoxConstraints(
-                        maxWidth:
-                            isLargeScreen
-                                ? 500
-                                : isTablet
-                                ? 400
-                                : double.infinity,
-                      ),
-                      child: Column(
-                        children: [
-                          // Name Field (Required)
-                          _buildTextField(
-                            controller: _nameController,
-                            labelText: 'Full Name *',
-                            hintText: 'Enter Your Full Name',
-                            keyboardType: TextInputType.name,
-                            enabled: !_isLoading,
-                            screenWidth: screenWidth,
-                            screenHeight: screenHeight,
-                            isTablet: isTablet,
-                            isLargeScreen: isLargeScreen,
-                            onChanged:
-                                (value) => setState(
-                                  () {},
-                                ), // Trigger rebuild for button state
-                          ),
-
-                          SizedBox(height: screenHeight * 0.025),
-
-                          // Phone Number Field (Required)
-                          _buildTextField(
-                            controller: _phoneController,
-                            labelText: 'Phone Number *',
-                            hintText: '9876543210',
-                            keyboardType: TextInputType.phone,
-                            enabled: !_isLoading && !_isPhoneReadOnly,
-                            readOnly: _isPhoneReadOnly,
-                            maxLength: 10,
-                            prefixText: _isPhoneReadOnly ? '+91 ' : null,
-                            screenWidth: screenWidth,
-                            screenHeight: screenHeight,
-                            isTablet: isTablet,
-                            isLargeScreen: isLargeScreen,
-                            onChanged:
-                                (value) => setState(
-                                  () {},
-                                ), // Trigger rebuild for button state
-                          ),
-
-                          SizedBox(height: screenHeight * 0.025),
-
-                          // Email Field (Required)
-                          _buildTextField(
-                            controller: _emailController,
-                            labelText: 'Email Address *',
-                            hintText: 'Enter Your Email Address',
-                            keyboardType: TextInputType.emailAddress,
-                            enabled: !_isLoading && !_isEmailReadOnly,
-                            readOnly: _isEmailReadOnly,
-                            screenWidth: screenWidth,
-                            screenHeight: screenHeight,
-                            isTablet: isTablet,
-                            isLargeScreen: isLargeScreen,
-                            onChanged:
-                                (value) => setState(
-                                  () {},
-                                ), // Trigger rebuild for button state
-                          ),
-
-                          SizedBox(height: screenHeight * 0.03),
-
-                          // Checkbox with Permissions Text (Required)
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Transform.scale(
-                                scale:
-                                    isLargeScreen
-                                        ? 1.2
-                                        : isTablet
-                                        ? 1.1
-                                        : 1.0,
-                                child: Checkbox(
-                                  value: checkboxValue,
-                                  activeColor: AppColors.primary,
-                                  checkColor: AppColors.white,
-                                  side: BorderSide(
-                                    color:
-                                        checkboxValue
-                                            ? AppColors.primary
-                                            : AppColors.textSecondary
-                                                .withOpacity(0.5),
-                                    width: 2,
-                                  ),
-                                  onChanged:
-                                      _isLoading
-                                          ? null
-                                          : (value) {
-                                            setState(() {
-                                              checkboxValue = value!;
-                                            });
-                                          },
-                                ),
-                              ),
-                              Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(
-                                    top: screenHeight * 0.015,
-                                    left: screenWidth * 0.02,
-                                  ),
-                                  child: RichText(
-                                    text: TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text:
-                                              "To get started, we will need access to your location, camera, and notifications. ",
-                                          style: AppFonts.regular16(
-                                            color: AppColors.textSecondary,
-                                          ).copyWith(
-                                            fontSize:
-                                                screenWidth *
-                                                (isLargeScreen
-                                                    ? 0.014
-                                                    : isTablet
-                                                    ? 0.025
-                                                    : 0.038),
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: "*",
-                                          style: AppFonts.regular16(
-                                            color: AppColors.darkRed,
-                                          ).copyWith(
-                                            fontSize:
-                                                screenWidth *
-                                                (isLargeScreen
-                                                    ? 0.014
-                                                    : isTablet
-                                                    ? 0.025
-                                                    : 0.038),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Fixed Bottom Button Container
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: screenWidth * 0.075,
-                vertical: screenHeight * 0.02,
-              ),
-              child: CommonButton(
-                text: _isLoading ? "Updating Profile..." : "Continue",
-                onTap:
-                    (areFieldsValid && !_isLoading)
-                        ? _updateUserProfile
-                        : () {},
-                backgroundColor:
-                    (areFieldsValid && !_isLoading)
-                        ? AppColors.primary
-                        : AppColors.textSecondary.withOpacity(0.3),
-                isEnabled: areFieldsValid && !_isLoading,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String labelText,
-    required String hintText,
-    required TextInputType keyboardType,
-    required bool enabled,
-    bool readOnly = false,
-    int? maxLength,
-    String? prefixText,
-    required double screenWidth,
-    required double screenHeight,
-    required bool isTablet,
-    required bool isLargeScreen,
-    Function(String)? onChanged,
-  }) {
-    return TextField(
-      controller: controller,
-      enabled: enabled,
-      readOnly: readOnly,
-      maxLength: maxLength,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      style: TextStyle(
-        fontSize:
-            screenWidth *
-            (isLargeScreen
-                ? 0.016
-                : isTablet
-                ? 0.025
-                : 0.04),
-        color: readOnly ? AppColors.textSecondary : AppColors.textPrimary,
-      ),
-      decoration: InputDecoration(
-        hintText: hintText,
-        labelText: labelText,
-        prefixText: prefixText,
-        hintStyle: TextStyle(
-          fontSize:
-              screenWidth *
-              (isLargeScreen
-                  ? 0.014
-                  : isTablet
-                  ? 0.022
-                  : 0.035),
-          color: AppColors.textSecondary.withOpacity(0.6),
-        ),
-        labelStyle: TextStyle(
-          fontSize:
-              screenWidth *
-              (isLargeScreen
-                  ? 0.014
-                  : isTablet
-                  ? 0.022
-                  : 0.035),
-          color: AppColors.textSecondary,
-        ),
-        counterStyle: TextStyle(
-          fontSize:
-              screenWidth *
-              (isLargeScreen
-                  ? 0.012
-                  : isTablet
-                  ? 0.02
-                  : 0.03),
-        ),
-        filled: readOnly,
-        fillColor: readOnly ? AppColors.textSecondary.withOpacity(0.1) : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: AppColors.textSecondary.withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: AppColors.textSecondary.withOpacity(readOnly ? 0.2 : 0.3),
-            width: 1,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color:
-                readOnly
-                    ? AppColors.textSecondary.withOpacity(0.3)
-                    : AppColors.primary,
-            width: 2,
-          ),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: AppColors.textSecondary.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
-        contentPadding: EdgeInsets.symmetric(
-          vertical: screenHeight * 0.02,
-          horizontal: screenWidth * 0.04,
-        ),
-      ),
-    );
   }
 }

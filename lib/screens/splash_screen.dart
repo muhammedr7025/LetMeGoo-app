@@ -5,7 +5,7 @@ import 'package:letmegoo/constants/app_images.dart';
 import 'package:letmegoo/constants/app_theme.dart';
 import 'package:letmegoo/models/login_method.dart';
 import 'package:letmegoo/services/auth_service.dart';
-import 'package:letmegoo/services/device_service.dart'; // Add this import
+import 'package:letmegoo/services/device_service.dart';
 import 'package:letmegoo/models/user_model.dart';
 import 'package:letmegoo/screens/login_page.dart';
 import 'package:letmegoo/screens/user_detail_reg_page.dart';
@@ -129,7 +129,7 @@ class _SplashScreenState extends State<SplashScreen>
       // Parse user data
       final UserModel user = UserModel.fromJson(userData);
 
-      // Check if user has valid username
+      // Check if user has valid username and required data
       if (user.fullname != "Unknown User" && user.phoneNumber != null) {
         // User has complete profile, navigate to home
         _updateLoadingText('Welcome back!');
@@ -165,6 +165,32 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
+  /// Determine login method from current user
+  LoginMethod _determineLoginMethod() {
+    final User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return LoginMethod.unknown;
+    }
+
+    // Check provider data to determine login method
+    for (UserInfo provider in user.providerData) {
+      switch (provider.providerId) {
+        case 'password':
+          return LoginMethod.email;
+        case 'google.com':
+          return LoginMethod.google;
+      }
+    }
+
+    // Fallback: check if email exists (likely email auth)
+    if (user.email != null && user.email!.isNotEmpty) {
+      return LoginMethod.email;
+    }
+
+    return LoginMethod.unknown;
+  }
+
   void _navigateToLogin() {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -191,21 +217,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _navigateToUserDetails() {
     // Determine login method
-    final User? user = FirebaseAuth.instance.currentUser;
-    LoginMethod loginMethod = LoginMethod.unknown;
-
-    if (user != null) {
-      for (UserInfo provider in user.providerData) {
-        switch (provider.providerId) {
-          case 'phone':
-            loginMethod = LoginMethod.phone;
-            break;
-          case 'google.com':
-            loginMethod = LoginMethod.google;
-            break;
-        }
-      }
-    }
+    final LoginMethod loginMethod = _determineLoginMethod();
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -230,129 +242,161 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final isTablet = screenWidth > 600;
-    final isLargeScreen = screenWidth > 900;
+
+    // Responsive breakpoints
+    final bool isLargeScreen = screenWidth > 1200;
+    final bool isTablet = screenWidth > 600 && screenWidth <= 1200;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SizedBox(
-          width: double.infinity,
-          height: double.infinity,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // App Logo with Animation
-              AnimatedBuilder(
-                animation: _logoController,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _logoScale.value,
-                    child: FadeTransition(
-                      opacity: _logoFade,
-                      child: Image.asset(
-                        AppImages.logo, // Your app logo
-                        width:
-                            screenWidth *
-                            (isLargeScreen
-                                ? 0.25
-                                : isTablet
-                                ? 0.3
-                                : 0.4),
-                        height:
-                            screenWidth *
-                            (isLargeScreen
-                                ? 0.25
-                                : isTablet
-                                ? 0.3
-                                : 0.4),
-                        fit: BoxFit.contain,
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Animated Logo
+                    AnimatedBuilder(
+                      animation: _logoController,
+                      builder: (context, child) {
+                        return FadeTransition(
+                          opacity: _logoFade,
+                          child: ScaleTransition(
+                            scale: _logoScale,
+                            child: Container(
+                              width:
+                                  screenWidth *
+                                  (isLargeScreen
+                                      ? 0.15
+                                      : isTablet
+                                      ? 0.25
+                                      : 0.4),
+                              height:
+                                  screenWidth *
+                                  (isLargeScreen
+                                      ? 0.15
+                                      : isTablet
+                                      ? 0.25
+                                      : 0.4),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(25),
+                                image: const DecorationImage(
+                                  image: AssetImage(AppImages.logo),
+                                  fit: BoxFit.cover,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withOpacity(0.2),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    SizedBox(height: screenHeight * 0.04),
+
+                    // App Name
+                    AnimatedBuilder(
+                      animation: _textController,
+                      builder: (context, child) {
+                        return SlideTransition(
+                          position: _textSlide,
+                          child: FadeTransition(
+                            opacity: _textFade,
+                            child: Text(
+                              "LetMeGoo",
+                              style: AppFonts.bold13(
+                                color: AppColors.primary,
+                              ).copyWith(
+                                fontSize:
+                                    screenWidth *
+                                    (isLargeScreen
+                                        ? 0.035
+                                        : isTablet
+                                        ? 0.045
+                                        : 0.08),
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    SizedBox(height: screenHeight * 0.02),
+
+                    // Tagline
+                    AnimatedBuilder(
+                      animation: _textController,
+                      builder: (context, child) {
+                        return SlideTransition(
+                          position: _textSlide,
+                          child: FadeTransition(
+                            opacity: _textFade,
+                            child: Text(
+                              "Your Smart Vehicle Assistant",
+                              style: AppFonts.regular16(
+                                color: AppColors.textSecondary,
+                              ).copyWith(
+                                fontSize:
+                                    screenWidth *
+                                    (isLargeScreen
+                                        ? 0.016
+                                        : isTablet
+                                        ? 0.025
+                                        : 0.04),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Loading indicator and text at bottom
+            Padding(
+              padding: EdgeInsets.only(bottom: screenHeight * 0.08),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
                       ),
                     ),
-                  );
-                },
-              ),
-
-              SizedBox(height: screenHeight * 0.04),
-
-              // App Name with Animation
-              SlideTransition(
-                position: _textSlide,
-                child: FadeTransition(
-                  opacity: _textFade,
-                  child: Column(
-                    children: [
-                      Text(
-                        'Let Me Goo',
-                        style: AppFonts.bold24().copyWith(
-                          fontSize:
-                              screenWidth *
-                              (isLargeScreen
-                                  ? 0.035
-                                  : isTablet
-                                  ? 0.045
-                                  : 0.08),
-                          color: AppColors.primary,
-                        ),
-                      ),
-
-                      SizedBox(height: screenHeight * 0.01),
-
-                      Text(
-                        'Smart app to unblock your way!',
-                        style: AppFonts.regular16().copyWith(
-                          fontSize:
-                              screenWidth *
-                              (isLargeScreen
-                                  ? 0.018
-                                  : isTablet
-                                  ? 0.025
-                                  : 0.04),
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
                   ),
-                ),
-              ),
-
-              SizedBox(height: screenHeight * 0.1),
-
-              // Loading Indicator
-              SizedBox(
-                width: screenWidth * 0.08,
-                height: screenWidth * 0.08,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                ),
-              ),
-
-              SizedBox(height: screenHeight * 0.02),
-
-              // Dynamic Loading Text
-              FadeTransition(
-                opacity: _textFade,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: Text(
+                  SizedBox(height: screenHeight * 0.02),
+                  Text(
                     _loadingText,
-                    key: ValueKey(_loadingText),
-                    style: AppFonts.regular14().copyWith(
+                    style: AppFonts.regular14(
+                      color: AppColors.textSecondary,
+                    ).copyWith(
                       fontSize:
                           screenWidth *
                           (isLargeScreen
-                              ? 0.016
+                              ? 0.014
                               : isTablet
                               ? 0.025
                               : 0.035),
-                      color: AppColors.textSecondary,
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
