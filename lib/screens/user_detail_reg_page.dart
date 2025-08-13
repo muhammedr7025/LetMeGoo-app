@@ -81,19 +81,6 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
     return LoginMethod.unknown;
   }
 
-  bool _areAllFieldsValid() {
-    String name = _nameController.text.trim();
-    String phone = _phoneController.text.trim();
-    String email = _emailController.text.trim();
-
-    return name.isNotEmpty &&
-        phone.isNotEmpty &&
-        phone.length == 10 &&
-        email.isNotEmpty &&
-        _isValidEmail(email) &&
-        checkboxValue;
-  }
-
   bool _isValidEmail(String email) {
     return RegExp(
       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',

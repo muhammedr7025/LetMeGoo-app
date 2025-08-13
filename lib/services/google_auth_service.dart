@@ -98,7 +98,7 @@ class GoogleAuthService {
 
       // Step 1: Call logout API (if not already called)
       try {
-        // Note: This will be called from AuthService.logout() 
+        // Note: This will be called from AuthService.logout()
         // so we don't need to call it again here to avoid duplication
         if (kDebugMode) {
           print('📡 Logout API call handled by AuthService');
@@ -123,10 +123,7 @@ class GoogleAuthService {
       }
 
       // Step 3: Sign out from Firebase and Google simultaneously
-      await Future.wait([
-        _auth.signOut(),
-        _googleSignIn.signOut(),
-      ]);
+      await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
 
       if (kDebugMode) {
         print('✅ Sign out successful from Firebase and Google');
@@ -135,7 +132,7 @@ class GoogleAuthService {
       if (kDebugMode) {
         print('❌ Error during sign out: $e');
       }
-      
+
       // Try individual signouts as fallback
       try {
         await _auth.signOut();
@@ -147,7 +144,7 @@ class GoogleAuthService {
           print('❌ Firebase sign out failed: $firebaseError');
         }
       }
-      
+
       try {
         await _googleSignIn.signOut();
         if (kDebugMode) {
@@ -158,12 +155,13 @@ class GoogleAuthService {
           print('❌ Google sign out failed: $googleError');
         }
       }
-      
+
       // Re-throw the error so caller knows something went wrong
       throw e;
     }
   }
-/// Alternative signOut method that includes API logout call
+
+  /// Alternative signOut method that includes API logout call
   /// Use this if you want to handle the full logout process from GoogleAuthService
   static Future<void> signOutWithAPI() async {
     try {
@@ -188,7 +186,7 @@ class GoogleAuthService {
 
       // Step 3: Sign out from Firebase and Google
       await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
-      
+
       if (kDebugMode) {
         print('✅ Complete sign out successful');
       }
@@ -196,7 +194,7 @@ class GoogleAuthService {
       if (kDebugMode) {
         print('❌ Error during complete sign out: $e');
       }
-      
+
       // Fallback: try local signout even if API fails
       try {
         await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
@@ -212,13 +210,13 @@ class GoogleAuthService {
     }
   }
 
-    /// Helper method to call logout API
+  /// Helper method to call logout API
   static Future<void> _callLogoutAPI() async {
     // Import necessary packages at the top of the file
     // import 'package:firebase_messaging/firebase_messaging.dart';
     // import 'package:http/http.dart' as http;
     // import 'dart:convert';
-    
+
     try {
       // Get Firebase user and token
       final User? firebaseUser = _auth.currentUser;
@@ -240,7 +238,7 @@ class GoogleAuthService {
       // Get device ID (FCM token)
       final FirebaseMessaging messaging = FirebaseMessaging.instance;
       final String? deviceId = await messaging.getToken();
-      
+
       if (deviceId == null) {
         if (kDebugMode) {
           print('Failed to get device ID, skipping logout API call');
@@ -249,31 +247,37 @@ class GoogleAuthService {
       }
 
       if (kDebugMode) {
-        print('🚪 Calling logout API with device_id: ${deviceId.substring(0, 10)}...');
+        print(
+          '🚪 Calling logout API with device_id: ${deviceId.substring(0, 10)}...',
+        );
       }
 
       // Make the API call
-      final response = await http.post(
-        Uri.parse('https://dev-api.letmegoo.com/api/user/logout'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Bearer $idToken',
-        },
-        body: 'device_id=$deviceId',
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('https://api.letmegoo.com/api/user/logout'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': 'Bearer $idToken',
+            },
+            body: 'device_id=$deviceId',
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (kDebugMode) {
         print('📤 Logout API response: ${response.statusCode}');
       }
-      
+
       if (response.statusCode == 200 || response.statusCode == 204) {
         if (kDebugMode) {
           print('✅ Logout API call successful');
         }
       } else {
         if (kDebugMode) {
-          print('⚠️ Logout API returned: ${response.statusCode} - ${response.body}');
+          print(
+            '⚠️ Logout API returned: ${response.statusCode} - ${response.body}',
+          );
         }
       }
     } catch (e) {
@@ -283,7 +287,6 @@ class GoogleAuthService {
       // Don't throw - continue with local logout
     }
   }
-
 
   /// Returns the current Firebase user, if one is authenticated.
   static User? getCurrentUser() {
@@ -299,9 +302,4 @@ class GoogleAuthService {
   static bool isSignedIn() {
     return _auth.currentUser != null;
   }
-
-
-
-
-  
 }

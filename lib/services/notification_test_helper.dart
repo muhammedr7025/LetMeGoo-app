@@ -5,17 +5,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:letmegoo/services/notification_service.dart';
 
 class NotificationTestHelper {
-  
   /// Test method to simulate notification tap
   static void simulateNotificationTap() {
     print('🧪 Simulating notification tap...');
-    
+
     // Create a mock RemoteMessage for testing
-    final Map<String, dynamic> mockData = {
-      'type': 'test',
-      'message': 'Test notification',
-    };
-    
+
     // Simulate the notification tap handling
     NotificationService.navigateToHomePage();
   }
@@ -25,9 +20,11 @@ class NotificationTestHelper {
     try {
       final String? token = await FirebaseMessaging.instance.getToken();
       print('🔑 Current FCM Token: $token');
-      
+
       // You can use this token to send test notifications from Firebase Console
-      print('📝 Copy this token to Firebase Console > Cloud Messaging > Send test message');
+      print(
+        '📝 Copy this token to Firebase Console > Cloud Messaging > Send test message',
+      );
     } catch (e) {
       print('❌ Error getting FCM token: $e');
     }
@@ -36,10 +33,12 @@ class NotificationTestHelper {
   /// Check notification permissions
   static Future<void> checkNotificationPermissions() async {
     try {
-      final NotificationSettings settings = 
+      final NotificationSettings settings =
           await FirebaseMessaging.instance.getNotificationSettings();
-      
-      print('🔔 Notification Permission Status: ${settings.authorizationStatus}');
+
+      print(
+        '🔔 Notification Permission Status: ${settings.authorizationStatus}',
+      );
       print('📱 Alert Setting: ${settings.alert}');
       print('🔊 Sound Setting: ${settings.sound}');
       print('🔴 Badge Setting: ${settings.badge}');

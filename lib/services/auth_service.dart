@@ -15,7 +15,7 @@ import 'package:letmegoo/services/google_auth_service.dart';
 import 'package:http_parser/http_parser.dart';
 
 class AuthService {
-  static const String baseUrl = 'https://dev-api.letmegoo.com/api';
+  static const String baseUrl = 'https://api.letmegoo.com/api';
   static const Duration timeoutDuration = Duration(seconds: 10);
   static const Duration connectivityTimeout = Duration(seconds: 5);
 

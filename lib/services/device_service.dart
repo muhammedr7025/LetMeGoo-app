@@ -7,7 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class DeviceService {
-  static const String baseUrl = 'https://dev-api.letmegoo.com/api';
+  static const String baseUrl = 'https://api.letmegoo.com/api';
   static const Duration timeoutDuration = Duration(seconds: 10);
 
   /// Register device for push notifications
