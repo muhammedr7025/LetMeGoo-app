@@ -129,7 +129,10 @@ class _VehicleAddSuccessPageState extends State<VehicleAddSuccessPage>
                             builder:
                                 (context) => PrivacyPreferencesPage(
                                   currentPreference: 'private',
-                                  onPreferenceChanged: (p0) {
+                                  isOnboarding:
+                                      true, // This tells the page it's part of onboarding flow
+                                  onPreferenceChanged: (newPreference) {
+                                    // This callback will handle navigation to home after privacy setting is updated
                                     CoreUtil.goToHomePage(context);
                                   },
                                 ),

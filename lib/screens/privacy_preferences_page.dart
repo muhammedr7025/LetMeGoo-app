@@ -6,11 +6,14 @@ import 'package:letmegoo/services/auth_service.dart';
 class PrivacyPreferencesPage extends StatefulWidget {
   final String currentPreference;
   final Function(String) onPreferenceChanged;
+  final bool isOnboarding; // Added parameter to detect onboarding flow
 
   const PrivacyPreferencesPage({
     super.key,
     required this.currentPreference,
     required this.onPreferenceChanged,
+    this.isOnboarding =
+        false, // Default to false for existing usage from profile page
   });
 
   @override
@@ -78,7 +81,12 @@ class _PrivacyPreferencesPageState extends State<PrivacyPreferencesPage> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context);
+
+          // Only pop if this is NOT part of onboarding flow
+          // During onboarding, the callback should handle navigation to home
+          if (!widget.isOnboarding) {
+            Navigator.pop(context);
+          }
         }
       }
     } on ConnectivityException catch (e) {
@@ -132,24 +140,25 @@ class _PrivacyPreferencesPageState extends State<PrivacyPreferencesPage> {
           ),
           child: Column(
             children: [
-              // Back button
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.black,
-                        size: 24,
+              // Back button - only show if not in onboarding flow
+              if (!widget.isOnboarding)
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        child: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.black,
+                          size: 24,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
 
-              const SizedBox(height: 40),
+              SizedBox(height: widget.isOnboarding ? 60 : 40),
 
               // Title
               Text(
@@ -166,7 +175,9 @@ class _PrivacyPreferencesPageState extends State<PrivacyPreferencesPage> {
                   horizontal: isSmallScreen ? 8 : 16,
                 ),
                 child: Text(
-                  "Choose what details you'd like to make visible\nto the person who reported your vehicle.",
+                  widget.isOnboarding
+                      ? "Choose what details you'd like to make visible\nwhen someone needs to contact you about your vehicle."
+                      : "Choose what details you'd like to make visible\nto the person who reported your vehicle.",
                   style: AppFonts.regular16(color: const Color(0xFF656565)),
                   textAlign: TextAlign.center,
                 ),

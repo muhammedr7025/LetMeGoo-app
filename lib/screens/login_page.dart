@@ -101,91 +101,104 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _handleEmailAuth() async {
-    if (!_validateEmailForm()) return;
+Future<void> _handleEmailAuth() async {
+  if (!_validateEmailForm()) return;
 
-    setState(() {
-      _isEmailLoading = true;
-    });
+  setState(() {
+    _isEmailLoading = true;
+  });
 
-    try {
-      UserCredential? userCredential;
+  try {
+    UserCredential? userCredential;
 
-      if (_isSignUp) {
-        // Sign up with email and password
-        userCredential = await EmailAuthService.signUpWithEmail(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+    if (_isSignUp) {
+      // Sign up with email and password
+      userCredential = await EmailAuthService.signUpWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-        if (userCredential != null) {
-          _showSnackBar('Account created successfully!', isError: false);
-          // Send email verification
-          await EmailAuthService.sendEmailVerification();
-          _showSnackBar(
-            'Verification email sent. Please check your inbox.',
-            isError: false,
-          );
-        }
-      } else {
-        // Sign in with email and password
-        userCredential = await EmailAuthService.signInWithEmail(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
-
-        if (userCredential != null) {
-          _showSnackBar('Email sign-in successful!', isError: false);
-        }
-      }
-
-      if (userCredential == null) {
+      if (userCredential != null) {
+        _showSnackBar('Account created successfully!', isError: false);
+        // Send email verification
+        await EmailAuthService.sendEmailVerification();
         _showSnackBar(
-          _isSignUp ? 'Failed to create account' : 'Failed to sign in',
-          isError: true,
+          'Verification email sent. Please check your inbox.',
+          isError: false,
         );
-        return;
       }
+    } else {
+      // Sign in with email and password
+      userCredential = await EmailAuthService.signInWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-      // Check if user profile is complete via API
-      try {
-        final userData = await AuthService.authenticateUser();
-
-        if (userData != null) {
-          // Parse user data using UserModel (same as splash screen)
-          final UserModel userModel = UserModel.fromJson(userData);
-
-          // Apply the same validation logic as splash screen
-          if (userModel.fullname != "Unknown User" &&
-              userModel.phoneNumber != null) {
-            // User has complete profile, navigate to main app
-            _navigateToMainApp();
-          } else {
-            // User needs to complete profile, navigate to user details
-            _navigateToUserDetails();
-          }
-        } else {
-          // User doesn't exist in backend, navigate to welcome/user details
-          _navigateToWelcome();
-        }
-      } catch (e) {
-        // API call failed, but email login succeeded
-        // Navigate to welcome page to complete setup
-        _navigateToWelcome();
+      if (userCredential != null) {
+        _showSnackBar('Email sign-in successful!', isError: false);
       }
-    } on FirebaseAuthException catch (e) {
-      _showSnackBar(EmailAuthService.getErrorMessage(e), isError: true);
-    } catch (e) {
+    }
+
+    if (userCredential == null) {
       _showSnackBar(
-        '${_isSignUp ? 'Sign up' : 'Sign in'} failed: ${e.toString()}',
+        _isSignUp ? 'Failed to create account' : 'Failed to sign in',
         isError: true,
       );
-    } finally {
-      setState(() {
-        _isEmailLoading = false;
-      });
+      return;
     }
+
+    // FIXED: Add the missing API authentication check for email login
+    // This is the same logic used for Google login
+    try {
+      print('🔍 Checking user profile via API...');
+      final userData = await AuthService.authenticateUser();
+
+      if (userData != null) {
+        print('✅ User found in backend');
+        // Parse user data using UserModel (same as splash screen)
+        final UserModel userModel = UserModel.fromJson(userData);
+        print('📊 User data: ${userModel.fullname}, Phone: ${userModel.phoneNumber}');
+
+        // Apply the same validation logic as splash screen
+        if (userModel.fullname != "Unknown User" && 
+            userModel.fullname!.isNotEmpty &&
+            userModel.phoneNumber != null && 
+            userModel.phoneNumber!.isNotEmpty) {
+          // User has complete profile, navigate to main app
+          print('🎯 Profile complete, navigating to main app');
+          _navigateToMainApp();
+        } else {
+          // User needs to complete profile, navigate to user details
+          print('📝 Profile incomplete, navigating to user details');
+          _navigateToUserDetails();
+        }
+      } else {
+        // User doesn't exist in backend, navigate to welcome/user details
+        print('❌ User not found in backend, navigating to welcome');
+        _navigateToWelcome();
+      }
+    } catch (e) {
+      print('💥 API call failed: $e');
+      // API call failed, but email login succeeded
+      // Navigate to welcome page to complete setup
+      _navigateToWelcome();
+    }
+
+  } on FirebaseAuthException catch (e) {
+    print('🔥 Firebase Auth Error: ${e.code} - ${e.message}');
+    _showSnackBar(EmailAuthService.getErrorMessage(e), isError: true);
+  } catch (e) {
+    print('💥 General Error: $e');
+    _showSnackBar(
+      '${_isSignUp ? 'Sign up' : 'Sign in'} failed: ${e.toString()}',
+      isError: true,
+    );
+  } finally {
+    setState(() {
+      _isEmailLoading = false;
+    });
   }
+}
 
   bool _validateEmailForm() {
     final email = _emailController.text.trim();
