@@ -112,6 +112,7 @@ class CreateReportPage extends ConsumerStatefulWidget {
 class _CreateReportPageState extends ConsumerState<CreateReportPage> {
   final TextEditingController regNumberController = TextEditingController();
   final LocationService _locationService = LocationService();
+  final ImagePicker _picker = ImagePicker(); // Add ImagePicker instance
 
   bool isAnonymous = true;
   List<File> _images = [];
@@ -145,15 +146,661 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
     );
   }
 
-  Future<void> _pickImages() async {
-    final picker = ImagePicker();
-    final List<XFile> picked = await picker.pickMultiImage();
+  // ENHANCED: Show image source selection dialog
+  // ENHANCED: Updated image source dialog with debug info
+  Future<void> _showImageSourceDialog() async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isTablet = screenWidth > 600;
+    final isLargeScreen = screenWidth > 900;
 
-    if (picked.isNotEmpty) {
-      setState(() {
-        _images = picked.map((xFile) => File(xFile.path)).toList();
-      });
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // FIXED: Allow custom height
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          // FIXED: Max height to prevent overflow
+          constraints: BoxConstraints(
+            maxHeight: screenHeight * 0.75, // Max 75% of screen height
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // FIXED: Use min size
+              children: [
+                // FIXED: Smaller padding
+                const SizedBox(height: 12),
+
+                // Handle bar
+                Container(
+                  width: 50,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // FIXED: Scrollable content
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Title
+                        Text(
+                          'Add Photos to Report',
+                          style: TextStyle(
+                            fontSize:
+                                screenWidth *
+                                (isLargeScreen
+                                    ? 0.018
+                                    : isTablet
+                                    ? 0.028
+                                    : 0.045), // FIXED: Smaller font
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+
+                        SizedBox(
+                          height: screenHeight * 0.01,
+                        ), // FIXED: Smaller spacing
+                        // Description
+                        Text(
+                          'Photos help provide clear evidence for your report',
+                          style: TextStyle(
+                            fontSize:
+                                screenWidth *
+                                (isLargeScreen
+                                    ? 0.014
+                                    : isTablet
+                                    ? 0.022
+                                    : 0.032), // FIXED: Smaller font
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        SizedBox(
+                          height: screenHeight * 0.025,
+                        ), // FIXED: Smaller spacing
+                        // Camera option
+                        _buildCompactImageSourceOption(
+                          icon: Icons.camera_alt,
+                          title: 'Take Photo',
+                          description: 'Use camera to capture evidence',
+                          onTap: () {
+                            Navigator.pop(context);
+                            _openCamera();
+                          },
+                          screenWidth: screenWidth,
+                          isTablet: isTablet,
+                          isLargeScreen: isLargeScreen,
+                        ),
+
+                        SizedBox(
+                          height: screenHeight * 0.012,
+                        ), // FIXED: Smaller spacing
+                        // Gallery option
+                        _buildCompactImageSourceOption(
+                          icon: Icons.photo_library,
+                          title: 'Choose from Gallery',
+                          description: 'Select existing photos',
+                          onTap: () {
+                            Navigator.pop(context);
+                            _pickImageFromSource(ImageSource.gallery);
+                          },
+                          screenWidth: screenWidth,
+                          isTablet: isTablet,
+                          isLargeScreen: isLargeScreen,
+                        ),
+
+                        SizedBox(
+                          height: screenHeight * 0.012,
+                        ), // FIXED: Smaller spacing
+                        // Multiple photos option
+                        _buildCompactImageSourceOption(
+                          icon: Icons.photo_library_outlined,
+                          title: 'Select Multiple Photos',
+                          description: 'Choose several photos at once',
+                          onTap: () {
+                            Navigator.pop(context);
+                            _pickMultipleImages();
+                          },
+                          screenWidth: screenWidth,
+                          isTablet: isTablet,
+                          isLargeScreen: isLargeScreen,
+                        ),
+
+                        SizedBox(
+                          height: screenHeight * 0.02,
+                        ), // FIXED: Smaller spacing
+                        // Cancel button
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize:
+                                  screenWidth *
+                                  (isLargeScreen
+                                      ? 0.016
+                                      : isTablet
+                                      ? 0.025
+                                      : 0.035),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // FIXED: Compact version of image source option to prevent overflow
+  Widget _buildCompactImageSourceOption({
+    required IconData icon,
+    required String title,
+    required String description,
+    required VoidCallback onTap,
+    required double screenWidth,
+    required bool isTablet,
+    required bool isLargeScreen,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: EdgeInsets.all(
+          screenWidth * 0.035,
+        ), // FIXED: Responsive padding
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.textSecondary.withOpacity(0.2)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            // FIXED: Smaller icon container
+            Container(
+              padding: EdgeInsets.all(
+                screenWidth * 0.025,
+              ), // FIXED: Responsive padding
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8), // FIXED: Smaller radius
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size:
+                    screenWidth *
+                    (isLargeScreen
+                        ? 0.02
+                        : isTablet
+                        ? 0.03
+                        : 0.05), // FIXED: Smaller icons
+              ),
+            ),
+
+            SizedBox(width: screenWidth * 0.03), // FIXED: Smaller spacing
+            // FIXED: Flexible text to prevent overflow
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // FIXED: Min size
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize:
+                          screenWidth *
+                          (isLargeScreen
+                              ? 0.014
+                              : isTablet
+                              ? 0.022
+                              : 0.035), // FIXED: Smaller font
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1, // FIXED: Prevent text overflow
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2), // FIXED: Minimal spacing
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize:
+                          screenWidth *
+                          (isLargeScreen
+                              ? 0.012
+                              : isTablet
+                              ? 0.018
+                              : 0.028), // FIXED: Smaller font
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 2, // FIXED: Limit lines
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+
+            // FIXED: Smaller arrow icon
+            Icon(
+              Icons.arrow_forward_ios,
+              color: AppColors.textSecondary,
+              size:
+                  screenWidth *
+                  (isLargeScreen
+                      ? 0.012
+                      : isTablet
+                      ? 0.018
+                      : 0.03), // FIXED: Smaller arrow
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ALTERNATIVE: Even more compact version if still having issues
+  Future<void> _showCompactImageSourceDialog() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  width: 50,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                Text(
+                  'Add Photos',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Simple button options
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Camera button
+                    _buildSimpleButton(
+                      icon: Icons.camera_alt,
+                      label: 'Camera',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _openCamera();
+                      },
+                    ),
+
+                    // Gallery button
+                    _buildSimpleButton(
+                      icon: Icons.photo_library,
+                      label: 'Gallery',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickImageFromSource(ImageSource.gallery);
+                      },
+                    ),
+
+                    // Multiple button
+                    _buildSimpleButton(
+                      icon: Icons.photo_library_outlined,
+                      label: 'Multiple',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickMultipleImages();
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Cancel
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Simple button widget
+  Widget _buildSimpleButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.primary, size: 30),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ENHANCED: Alternative camera method with better error handling
+  Future<void> _openCamera() async {
+    try {
+      print('🔍 Opening camera directly...');
+
+      // Direct camera call with all parameters
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+
+      if (photo != null) {
+        print('✅ Camera photo captured: ${photo.path}');
+        final File imageFile = File(photo.path);
+
+        // Verify file exists
+        if (await imageFile.exists()) {
+          setState(() {
+            _images.add(imageFile);
+          });
+          _showSnackBar('Photo captured and added!', isError: false);
+        } else {
+          print('❌ File does not exist at path: ${photo.path}');
+          _showSnackBar('Failed to save photo', isError: true);
+        }
+      } else {
+        print('❌ Camera returned null');
+        _showSnackBar('Camera was cancelled or failed', isError: false);
+      }
+    } catch (e) {
+      print('💥 Camera error: $e');
+      _showSnackBar('Camera error: $e', isError: true);
     }
+  }
+
+  // ENHANCED: Test all image sources
+  // Future<void> _testAllImageSources() async {
+  //   showDialog(
+  //     context: context,
+  //     builder:
+  //         (context) => AlertDialog(
+  //           title: Text('Test Image Sources'),
+  //           content: Column(
+  //             mainAxisSize: MainAxisSize.min,
+  //             children: [
+  //               ElevatedButton(
+  //                 onPressed: () async {
+  //                   Navigator.pop(context);
+  //                   await _openCamera();
+  //                 },
+  //                 child: Text('Test Camera Direct'),
+  //               ),
+  //               SizedBox(height: 10),
+  //               ElevatedButton(
+  //                 onPressed: () async {
+  //                   Navigator.pop(context);
+  //                   await _pickImageFromSource(ImageSource.camera);
+  //                 },
+  //                 child: Text('Test Camera via Source'),
+  //               ),
+  //               SizedBox(height: 10),
+  //               ElevatedButton(
+  //                 onPressed: () async {
+  //                   Navigator.pop(context);
+  //                   await _pickImageFromSource(ImageSource.gallery);
+  //                 },
+  //                 child: Text('Test Gallery'),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //   );
+  // }
+
+  // ENHANCED: Build image source option widget
+  Widget _buildImageSourceOption({
+    required IconData icon,
+    required String title,
+    required String description,
+    required VoidCallback onTap,
+    required double screenWidth,
+    required bool isTablet,
+    required bool isLargeScreen,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.textSecondary.withOpacity(0.2)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size:
+                    screenWidth *
+                    (isLargeScreen
+                        ? 0.025
+                        : isTablet
+                        ? 0.035
+                        : 0.06),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppFonts.semiBold16().copyWith(
+                      fontSize:
+                          screenWidth *
+                          (isLargeScreen
+                              ? 0.016
+                              : isTablet
+                              ? 0.025
+                              : 0.04),
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: AppFonts.regular14().copyWith(
+                      fontSize:
+                          screenWidth *
+                          (isLargeScreen
+                              ? 0.012
+                              : isTablet
+                              ? 0.02
+                              : 0.032),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: AppColors.textSecondary,
+              size:
+                  screenWidth *
+                  (isLargeScreen
+                      ? 0.015
+                      : isTablet
+                      ? 0.02
+                      : 0.04),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ENHANCED: Pick image from specific source (camera or gallery)
+  Future<void> _pickImageFromSource(ImageSource source) async {
+    try {
+      print('🔍 Attempting to pick image from: ${source.name}');
+
+      // For camera, be more explicit
+      XFile? image;
+
+      if (source == ImageSource.camera) {
+        // Force camera with explicit parameters
+        image = await _picker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1920,
+          maxHeight: 1080,
+          imageQuality: 85,
+          preferredCameraDevice: CameraDevice.rear, // Force rear camera
+        );
+        print('📸 Camera result: ${image?.path ?? 'null'}');
+      } else {
+        // Gallery selection
+        image = await _picker.pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1920,
+          maxHeight: 1080,
+          imageQuality: 85,
+        );
+        print('🖼️ Gallery result: ${image?.path ?? 'null'}');
+      }
+
+      if (image != null) {
+        print('✅ Image captured successfully: ${image.path}');
+        setState(() {
+          _images.add(File(image!.path));
+        });
+        _showSnackBar(
+          source == ImageSource.camera
+              ? 'Photo captured successfully!'
+              : 'Photo selected successfully!',
+          isError: false,
+        );
+      } else {
+        print('❌ No image selected/captured');
+        _showSnackBar(
+          source == ImageSource.camera
+              ? 'Camera was cancelled'
+              : 'No photo selected',
+          isError: false,
+        );
+      }
+    } catch (e) {
+      print('💥 Error picking image: $e');
+      String errorMessage =
+          'Failed to ${source == ImageSource.camera ? 'capture' : 'select'} photo: $e';
+      _showSnackBar(errorMessage, isError: true);
+    }
+  }
+
+  // ENHANCED: Pick multiple images from gallery
+  Future<void> _pickMultipleImages() async {
+    try {
+      final List<XFile> images = await _picker.pickMultiImage(
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (images.isNotEmpty) {
+        setState(() {
+          _images.addAll(images.map((xFile) => File(xFile.path)));
+        });
+        _showSnackBar(
+          '${images.length} photos added successfully',
+          isError: false,
+        );
+      }
+    } catch (e) {
+      _showSnackBar('Failed to select photos: ${e.toString()}', isError: true);
+    }
+  }
+
+  // ENHANCED: Keep your original _pickImages method but update it to use the dialog
+  Future<void> _pickImages() async {
+    _showImageSourceDialog();
+  }
+
+  // ENHANCED: Add SnackBar helper method
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppColors.darkRed : AppColors.primary,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<Position?> _getCurrentLocation() async {
@@ -783,6 +1430,54 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
                             // Show selected images
                             if (_images.isNotEmpty) ...[
                               SizedBox(height: screenHeight * 0.02),
+
+                              // ENHANCED: Header with count and clear all
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Photos (${_images.length})',
+                                    style: AppFonts.semiBold16().copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontSize:
+                                          screenWidth *
+                                          (isLargeScreen
+                                              ? 0.016
+                                              : isTablet
+                                              ? 0.025
+                                              : 0.04),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _images.clear();
+                                      });
+                                      _showSnackBar(
+                                        'All photos removed',
+                                        isError: false,
+                                      );
+                                    },
+                                    child: Text(
+                                      'Clear All',
+                                      style: AppFonts.regular14().copyWith(
+                                        color: AppColors.darkRed,
+                                        fontSize:
+                                            screenWidth *
+                                            (isLargeScreen
+                                                ? 0.014
+                                                : isTablet
+                                                ? 0.022
+                                                : 0.032),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              SizedBox(height: screenHeight * 0.01),
+
                               SizedBox(
                                 height: screenHeight * 0.15,
                                 child: ListView.builder(
@@ -790,12 +1485,13 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
                                   itemCount: _images.length,
                                   itemBuilder: (context, index) {
                                     return Container(
-                                      margin: const EdgeInsets.only(right: 10),
+                                      margin: const EdgeInsets.only(right: 12),
                                       child: Stack(
                                         children: [
+                                          // ENHANCED: Image with border radius
                                           ClipRRect(
                                             borderRadius: BorderRadius.circular(
-                                              10,
+                                              12,
                                             ),
                                             child: Image.file(
                                               _images[index],
@@ -804,27 +1500,63 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
                                               fit: BoxFit.cover,
                                             ),
                                           ),
+
+                                          // ENHANCED: Improved delete button
                                           Positioned(
-                                            top: 5,
-                                            right: 5,
+                                            top: 8,
+                                            right: 8,
                                             child: GestureDetector(
                                               onTap: () {
                                                 setState(() {
                                                   _images.removeAt(index);
                                                 });
+                                                _showSnackBar(
+                                                  'Photo removed',
+                                                  isError: false,
+                                                );
                                               },
                                               child: Container(
                                                 padding: const EdgeInsets.all(
-                                                  2,
+                                                  6,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  color: AppColors.darkRed,
-                                                  shape: BoxShape.circle,
+                                                  color: AppColors.darkRed
+                                                      .withOpacity(0.9),
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
                                                 ),
                                                 child: Icon(
                                                   Icons.close,
                                                   color: AppColors.white,
                                                   size: 16,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+
+                                          // ENHANCED: Image index indicator
+                                          Positioned(
+                                            bottom: 8,
+                                            left: 8,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(
+                                                  0.7,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                '${index + 1}',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
                                                 ),
                                               ),
                                             ),

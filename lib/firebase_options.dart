@@ -58,7 +58,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCcglrv82GSKICJ7efUsy4tVPTbq2wN0UY',
-    appId: '1:357972744272:android:586f14a3a8d2e93ee19955',
+    appId: '1:357972744272:android:d4cea1bc85d08e9de19955',
     messagingSenderId: '357972744272',
     projectId: 'letmegoo-2aab1',
     storageBucket: 'letmegoo-2aab1.firebasestorage.app',
@@ -70,6 +70,9 @@ class DefaultFirebaseOptions {
     messagingSenderId: '357972744272',
     projectId: 'letmegoo-2aab1',
     storageBucket: 'letmegoo-2aab1.firebasestorage.app',
+    androidClientId: '357972744272-ruir0d8euj6764v7e3ej17t5tponffjb.apps.googleusercontent.com',
+    iosClientId: '357972744272-kd6kb06pl69huaroo0t593nae0eh35e9.apps.googleusercontent.com',
     iosBundleId: 'com.example.letmegoo',
   );
+
 }

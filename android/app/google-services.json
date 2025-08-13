@@ -7,20 +7,12 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:357972744272:android:586f14a3a8d2e93ee19955",
+        "mobilesdk_app_id": "1:357972744272:android:d4cea1bc85d08e9de19955",
         "android_client_info": {
-          "package_name": "com.example.letmegoo"
+          "package_name": "com.letmegoo.app"
         }
       },
       "oauth_client": [
-        {
-          "client_id": "357972744272-ruir0d8euj6764v7e3ej17t5tponffjb.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.letmegoo",
-            "certificate_hash": "e88c2a2306dd8e1a2a2d3b3935049df4aed29459"
-          }
-        },
         {
           "client_id": "357972744272-hkf4e8kias78kmr85cok76uom5t8of4g.apps.googleusercontent.com",
           "client_type": 3
