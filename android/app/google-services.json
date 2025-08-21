@@ -14,6 +14,30 @@
       },
       "oauth_client": [
         {
+          "client_id": "357972744272-8m6c9fgd892kdb8iitv06d25n3pjatk5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.letmegoo.app",
+            "certificate_hash": "e88c2a2306dd8e1a2a2d3b3935049df4aed29459"
+          }
+        },
+        {
+          "client_id": "357972744272-kgj8ugut92vb1uh50d9aj5q8hs21t54t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.letmegoo.app",
+            "certificate_hash": "c3de4ed5ad7e9f16a960444cccff4f9119519372"
+          }
+        },
+        {
+          "client_id": "357972744272-rfqg1s7ui14dlgujr45vlunrc4imgbjp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.letmegoo.app",
+            "certificate_hash": "448b8f5e17c7079839481448868d98dfb1cfb43a"
+          }
+        },
+        {
           "client_id": "357972744272-hkf4e8kias78kmr85cok76uom5t8of4g.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -31,10 +55,10 @@
               "client_type": 3
             },
             {
-              "client_id": "357972744272-kd6kb06pl69huaroo0t593nae0eh35e9.apps.googleusercontent.com",
+              "client_id": "357972744272-a8df1e1uh4eidmbq2j0b28hnlugfccpi.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.letmegoo"
+                "bundle_id": "com.letmegoo.app"
               }
             }
           ]
