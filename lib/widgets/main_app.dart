@@ -23,10 +23,11 @@ class _MainAppState extends State<MainApp> {
     // Navigate to HomePage (which now shows reports)
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => HomePage(
-        onNavigate: _onNavigate, 
-        onAddPressed: _onAddPressed
-      )),
+      MaterialPageRoute(
+        builder:
+            (context) =>
+                HomePage(onNavigate: _onNavigate, onAddPressed: _onAddPressed),
+      ),
     );
   }
 
@@ -35,14 +36,20 @@ class _MainAppState extends State<MainApp> {
     switch (_currentIndex) {
       case 0:
         // CreateReportPage is now the home page
-        return CreateReportPage(onNavigate: _onNavigate, onAddPressed: _onAddPressed);
+        return CreateReportPage(
+          onNavigate: _onNavigate,
+          onAddPressed: _onAddPressed,
+        );
       case 1:
         return ProfilePage(
           onNavigate: _onNavigate,
           onAddPressed: _onAddPressed,
         );
       default:
-        return CreateReportPage(onNavigate: _onNavigate, onAddPressed: _onAddPressed);
+        return CreateReportPage(
+          onNavigate: _onNavigate,
+          onAddPressed: _onAddPressed,
+        );
     }
   }
 }

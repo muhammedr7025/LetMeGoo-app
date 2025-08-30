@@ -130,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen>
       final UserModel user = UserModel.fromJson(userData);
 
       // Check if user has valid username and required data
-      if (user.fullname != "Unknown User" && user.phoneNumber != null) {
+      if (user.fullname != "Unknown User" && user.fullname!.isNotEmpty) {
         // User has complete profile, navigate to home
         _updateLoadingText('Welcome back!');
         await Future.delayed(const Duration(milliseconds: 500));
@@ -195,7 +195,7 @@ class _SplashScreenState extends State<SplashScreen>
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (_, __, ___) => const LoginPage(),
+        pageBuilder: (_, __, ___) => LoginPage(),
         transitionsBuilder:
             (_, animation, __, child) =>
                 FadeTransition(opacity: animation, child: child),

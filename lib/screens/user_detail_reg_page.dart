@@ -87,6 +87,12 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
     ).hasMatch(email);
   }
 
+  bool _isValidPhoneNumber(String phone) {
+    // Phone number validation - should be 10 digits if provided
+    if (phone.isEmpty) return true; // Allow empty phone number
+    return phone.length == 10 && RegExp(r'^[0-9]+$').hasMatch(phone);
+  }
+
   Future<void> _updateUserProfile() async {
     // Validate fields
     String name = _nameController.text.trim();
@@ -98,16 +104,16 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
       return;
     }
 
-    if (phone.isEmpty || phone.length != 10) {
-      _showSnackBar(
-        "Please enter a valid 10-digit phone number",
-        isError: true,
-      );
+    if (email.isEmpty || !_isValidEmail(email)) {
+      _showSnackBar("Please enter a valid email address", isError: true);
       return;
     }
 
-    if (email.isEmpty || !_isValidEmail(email)) {
-      _showSnackBar("Please enter a valid email address", isError: true);
+    if (phone.isNotEmpty && !_isValidPhoneNumber(phone)) {
+      _showSnackBar(
+        "Please enter a valid 10-digit phone number or leave it empty",
+        isError: true,
+      );
       return;
     }
 
@@ -121,21 +127,67 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
     });
 
     try {
-      // Format phone number with country code for API
-      String formattedPhone = phone.startsWith('91') ? phone : '91$phone';
-      if (formattedPhone.startsWith('+')) {
-        formattedPhone = formattedPhone.substring(1);
+      // Format phone number with country code if provided
+      String? formattedPhone;
+      if (phone.isNotEmpty) {
+        formattedPhone = phone.startsWith('91') ? phone : '91$phone';
+        if (formattedPhone.startsWith('+')) {
+          formattedPhone = formattedPhone.substring(1);
+        }
       }
 
-      final result = await AuthService.updateUserProfile(
-        fullname: name,
-        email: email,
-        phoneNumber: formattedPhone,
-        companyName: "", // Empty company name since field is removed
-      );
+      // For new users after email verification, we need to create the backend user
+      // First, get a fresh Firebase token
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Force token refresh to ensure we have valid auth
+      await user.getIdToken(true);
+
+      Map<String, dynamic>? result;
+
+      // First, try to authenticate to check if user exists in backend
+      try {
+        result = await AuthService.authenticateUser();
+        print('User exists in backend, updating profile...');
+      } catch (e) {
+        print('User may not exist in backend yet: $e');
+        result = null;
+      }
 
       if (result != null) {
-        _showSnackBar("Profile updated successfully!", isError: false);
+        // User exists in backend, update their profile
+        result = await AuthService.updateUserProfile(
+          fullname: name,
+          email: email,
+          phoneNumber: formattedPhone,
+          companyName: "",
+        );
+      } else {
+        // User doesn't exist in backend yet (new user)
+        // The authenticateUser endpoint should create the user if they don't exist
+        // Wait a moment and try again
+        print('New user detected, creating backend user...');
+        await Future.delayed(const Duration(seconds: 1));
+
+        // Try authenticate again - this should create the user
+        result = await AuthService.authenticateUser();
+
+        if (result != null) {
+          // Now update the profile
+          result = await AuthService.updateUserProfile(
+            fullname: name,
+            email: email,
+            phoneNumber: formattedPhone,
+            companyName: "",
+          );
+        }
+      }
+
+      if (result != null) {
+        _showSnackBar("Profile created successfully!", isError: false);
 
         // Navigate to next screen (Add Vehicle Page)
         Navigator.pushReplacement(
@@ -144,12 +196,35 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
         );
       } else {
         _showSnackBar(
-          "Failed to update profile. Please try again.",
+          "Failed to create profile. Please try again.",
           isError: true,
         );
       }
+    } on AuthException catch (e) {
+      // Handle authentication errors specifically
+      print('Auth error: ${e.toString()}');
+
+      // Check if this is a "user not found" type error
+      if (e.message.toLowerCase().contains('authentication') ||
+          e.message.toLowerCase().contains('user') ||
+          e.message.toLowerCase().contains('token')) {
+        _showSnackBar(
+          "There was an issue with your account. Please sign in again.",
+          isError: true,
+        );
+
+        // Sign out and redirect to login
+        await FirebaseAuth.instance.signOut();
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login', // Replace with your login route
+          (route) => false,
+        );
+      } else {
+        _showSnackBar("Error: ${e.message}", isError: true);
+      }
     } catch (e) {
-      _showSnackBar("Error updating profile: ${e.toString()}", isError: true);
+      print('Profile creation error: ${e.toString()}');
+      _showSnackBar("Error creating profile: ${e.toString()}", isError: true);
     } finally {
       setState(() {
         _isLoading = false;
@@ -160,9 +235,14 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
   void _showSnackBar(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        duration: const Duration(seconds: 3),
+        content: Text(
+          message,
+          style: AppFonts.regular14().copyWith(color: AppColors.white),
+        ),
+        backgroundColor: isError ? AppColors.textError : AppColors.textSuccess,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -190,7 +270,7 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back),
+                    icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -215,10 +295,17 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                           : 0.25),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(15),
-                    image: const DecorationImage(
-                      image: AssetImage(AppImages.logo),
-                      fit: BoxFit.cover,
-                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.2),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image.asset(AppImages.logo, fit: BoxFit.cover),
                   ),
                 ),
 
@@ -227,7 +314,7 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                 // Title
                 Text(
                   "Complete Your Profile",
-                  style: AppFonts.bold13(color: AppColors.primary).copyWith(
+                  style: AppFonts.bold24().copyWith(
                     fontSize:
                         screenWidth *
                         (isLargeScreen
@@ -235,6 +322,7 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                             : isTablet
                             ? 0.035
                             : 0.055),
+                    color: AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -246,9 +334,7 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                   padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
                   child: Text(
                     "Please provide your details to complete your profile",
-                    style: AppFonts.regular13(
-                      color: AppColors.textSecondary,
-                    ).copyWith(
+                    style: AppFonts.regular16().copyWith(
                       fontSize:
                           screenWidth *
                           (isLargeScreen
@@ -256,6 +342,7 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                               : isTablet
                               ? 0.025
                               : 0.035),
+                      color: AppColors.textSecondary,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -278,15 +365,41 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                       TextFormField(
                         controller: _nameController,
                         enabled: !_isLoading,
+                        style: AppFonts.regular16(),
                         decoration: InputDecoration(
-                          labelText: 'Full Name',
+                          labelText: 'Full Name *',
+                          labelStyle: AppFonts.regular14().copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                           hintText: 'Enter your full name',
-                          prefixIcon: const Icon(Icons.person_outline),
+                          hintStyle: AppFonts.regular14().copyWith(
+                            color: AppColors.textSecondary.withOpacity(0.7),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.person_outline,
+                            color: AppColors.textSecondary,
+                          ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.textSecondary.withOpacity(0.3),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.textSecondary.withOpacity(0.3),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.primary,
+                              width: 2,
+                            ),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: AppColors.background,
                         ),
                       ),
 
@@ -297,44 +410,112 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         enabled: !_isLoading && !_isEmailReadOnly,
+                        style: AppFonts.regular16().copyWith(
+                          color:
+                              _isEmailReadOnly
+                                  ? AppColors.textSecondary
+                                  : AppColors.textPrimary,
+                        ),
                         decoration: InputDecoration(
-                          labelText: 'Email Address',
+                          labelText: 'Email Address *',
+                          labelStyle: AppFonts.regular14().copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                           hintText: 'Enter your email',
-                          prefixIcon: const Icon(Icons.email_outlined),
+                          hintStyle: AppFonts.regular14().copyWith(
+                            color: AppColors.textSecondary.withOpacity(0.7),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
+                            color: AppColors.textSecondary,
+                          ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.textSecondary.withOpacity(0.3),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.textSecondary.withOpacity(0.3),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.primary,
+                              width: 2,
+                            ),
                           ),
                           filled: true,
                           fillColor:
                               _isEmailReadOnly
-                                  ? Colors.grey[200]
-                                  : Colors.white,
+                                  ? AppColors.textSecondary.withOpacity(0.1)
+                                  : AppColors.background,
                           suffixIcon:
                               _isEmailReadOnly
-                                  ? const Icon(Icons.lock_outline, size: 16)
+                                  ? Icon(
+                                    Icons.lock_outline,
+                                    size: 16,
+                                    color: AppColors.textSecondary,
+                                  )
                                   : null,
                         ),
                       ),
 
                       SizedBox(height: screenHeight * 0.02),
 
-                      // Phone Number Input
+                      // Phone Number Input (Optional)
                       TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
                         maxLength: 10,
                         enabled: !_isLoading,
+                        style: AppFonts.regular16(),
                         decoration: InputDecoration(
-                          labelText: 'Phone Number',
+                          labelText: 'Phone Number (Optional)',
+                          labelStyle: AppFonts.regular14().copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                           hintText: 'Enter 10-digit phone number',
-                          prefixIcon: const Icon(Icons.phone_outlined),
+                          hintStyle: AppFonts.regular14().copyWith(
+                            color: AppColors.textSecondary.withOpacity(0.7),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.phone_outlined,
+                            color: AppColors.textSecondary,
+                          ),
                           prefixText: '+91 ',
+                          prefixStyle: AppFonts.regular16().copyWith(
+                            color: AppColors.textPrimary,
+                          ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.textSecondary.withOpacity(0.3),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.textSecondary.withOpacity(0.3),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.primary,
+                              width: 2,
+                            ),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: AppColors.background,
                           counterText: '', // Hide character counter
+                          helperText: 'You can add this later in settings',
+                          helperStyle: AppFonts.regular13().copyWith(
+                            color: AppColors.textSecondary.withOpacity(0.8),
+                          ),
                         ),
                       ),
 
@@ -361,7 +542,7 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                               padding: const EdgeInsets.only(top: 12),
                               child: Text(
                                 "I agree to the Terms of Service and Privacy Policy. I also consent to receive notifications and updates.",
-                                style: AppFonts.regular13(
+                                style: AppFonts.regular14().copyWith(
                                   color: AppColors.textSecondary,
                                 ),
                               ),
@@ -408,8 +589,8 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Signed in with ${_currentLoginMethod.displayName}',
-                                style: AppFonts.regular13(
+                                'Signed in with ${_getLoginMethodDisplayName(_currentLoginMethod)}',
+                                style: AppFonts.regular13().copyWith(
                                   color: AppColors.primary,
                                 ),
                               ),
@@ -427,6 +608,19 @@ class _UserDetailRegPageState extends State<UserDetailRegPage> {
         ),
       ),
     );
+  }
+
+  String _getLoginMethodDisplayName(LoginMethod method) {
+    switch (method) {
+      case LoginMethod.email:
+        return 'Email';
+      case LoginMethod.google:
+        return 'Google';
+      case LoginMethod.phone:
+        return 'Phone';
+      default:
+        return 'Unknown';
+    }
   }
 
   @override

@@ -127,7 +127,7 @@ class AuthService {
   static Future<Map<String, dynamic>?> updateUserProfile({
     required String fullname,
     required String email,
-    required String phoneNumber,
+    String? phoneNumber, // Made optional
     String? companyName,
   }) async {
     // Input validation
@@ -137,7 +137,11 @@ class AuthService {
     if (!_isValidEmail(email)) {
       throw ValidationException('Invalid email format');
     }
-    if (!_isValidPhoneNumber(phoneNumber)) {
+
+    // Only validate phone number if provided
+    if (phoneNumber != null &&
+        phoneNumber.isNotEmpty &&
+        !_isValidPhoneNumber(phoneNumber)) {
       throw ValidationException('Invalid phone number format');
     }
 
@@ -153,8 +157,12 @@ class AuthService {
       final Map<String, String> formData = {
         'fullname': fullname.trim(),
         'email': email.trim(),
-        'phone_number': phoneNumber.trim(),
       };
+
+      // Only include phone number if provided and not empty
+      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+        formData['phone_number'] = phoneNumber.trim();
+      }
 
       if (companyName?.isNotEmpty == true) {
         formData['company_name'] = companyName!.trim();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:letmegoo/constants/app_theme.dart';
 import 'package:letmegoo/screens/about_us_page.dart';
+import 'package:letmegoo/screens/edit_profile_page.dart';
 import 'package:letmegoo/screens/my_vehicles_page.dart';
 import 'package:letmegoo/screens/privacy_policy_page.dart';
 import 'package:letmegoo/screens/privacy_preferences_page.dart';
@@ -171,6 +172,33 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             ),
                             child: Column(
                               children: [
+                                Profileoption(
+                                  icon: Icons.edit_outlined,
+                                  title: "Edit Profile",
+                                  trailing: Icon(
+                                    Icons.chevron_right,
+                                    color: AppColors.textSecondary,
+                                    size:
+                                        screenWidth *
+                                        (isLargeScreen
+                                            ? 0.025
+                                            : isTablet
+                                            ? 0.035
+                                            : 0.06),
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) =>
+                                                const EditProfilePage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                CustomDivider(screenWidth: screenWidth),
+
                                 Profileoption(
                                   icon: Icons.lock_outline,
                                   title: "Privacy Preference",

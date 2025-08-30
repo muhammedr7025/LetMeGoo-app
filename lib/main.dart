@@ -49,7 +49,7 @@ class MyApp extends StatelessWidget {
       home: const SplashScreen(),
       routes: {
         '/splash': (context) => const SplashScreen(),
-        '/login': (context) => const LoginPage(),
+        '/login': (context) => LoginPage(),
       },
       onUnknownRoute: (settings) {
         return MaterialPageRoute(builder: (context) => const SplashScreen());
