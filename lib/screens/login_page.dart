@@ -10,9 +10,12 @@ import 'package:letmegoo/screens/user_detail_reg_page.dart';
 import 'package:letmegoo/screens/welcome_page.dart';
 import 'package:letmegoo/widgets/main_app.dart';
 import 'package:letmegoo/services/google_auth_service.dart';
+import 'package:letmegoo/services/apple_auth_service.dart';
 import 'package:letmegoo/services/auth_service.dart';
 import 'package:letmegoo/services/device_service.dart';
 import 'package:letmegoo/models/login_method.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'dart:io' show Platform;
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,6 +26,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _isGoogleLoading = false;
+  bool _isAppleLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -77,28 +81,27 @@ class _LoginPageState extends State<LoginPage> {
                             isLargeScreen,
                           ),
 
-                          // Feature List - Compact for small screens
-                          _buildFeaturesList(
-                            screenWidth,
-                            isTablet,
-                            availableHeight < 700,
-                          ),
+                          // // Feature List - Compact for small screens
+                          // _buildFeaturesList(
+                          //   screenWidth,
+                          //   isTablet,
+                          //   availableHeight < 700,
+                          // ),
 
                           // Login Section
                           Column(
                             children: [
                               // Decorative line
-                              Container(
-                                width: screenWidth * 0.4,
-                                height: 1,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: AppColors.primary,
-                                    width: 1,
-                                  ),
-                                ),
-                              ),
-
+                              // Container(
+                              //   width: screenWidth * 0.4,
+                              //   height: 1,
+                              //   decoration: BoxDecoration(
+                              //     border: Border.all(
+                              //       color: AppColors.primary,
+                              //       width: 1,
+                              //     ),
+                              //   ),
+                              // ),
                               SizedBox(height: sectionSpacing),
 
                               // Login Buttons
@@ -321,6 +324,7 @@ class _LoginPageState extends State<LoginPage> {
     final buttonHeight = isCompact ? 48.0 : 54.0;
     final spacing = isCompact ? 12.0 : 16.0;
     final fontSize = isCompact ? 15.0 : 16.0;
+    final showAppleSignIn = Platform.isIOS;
 
     return Center(
       child: SizedBox(
@@ -354,7 +358,7 @@ class _LoginPageState extends State<LoginPage> {
 
             SizedBox(height: spacing),
 
-            // Secondary Google Button
+            // Google Sign-In Button
             SizedBox(
               width: double.infinity,
               height: buttonHeight,
@@ -400,6 +404,65 @@ class _LoginPageState extends State<LoginPage> {
                         ),
               ),
             ),
+
+            // Apple Sign-In Button (only on iOS)
+            // Replace the existing Apple Sign-In button with this custom one
+            // that matches the Google Sign-In button style
+
+            // Apple Sign-In Button (only on iOS)
+            if (showAppleSignIn) ...[
+              SizedBox(height: spacing),
+              SizedBox(
+                width: double.infinity,
+                height: buttonHeight,
+                child: OutlinedButton(
+                  onPressed: _isAppleLoading ? null : _handleAppleSignIn,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: AppColors.white,
+                    side: BorderSide(
+                      color: AppColors.textSecondary,
+                      width: 0.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child:
+                      _isAppleLoading
+                          ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.primary,
+                              ),
+                            ),
+                          )
+                          : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                AppImages
+                                    .appleLogo, // You'll need to add this to your assets
+                                width: isCompact ? 20 : 24,
+                                height: isCompact ? 20 : 24,
+                                color: AppColors.textPrimary,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Continue with Apple',
+                                style: AppFonts.regular16().copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: fontSize,
+                                ),
+                              ),
+                            ],
+                          ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -551,7 +614,7 @@ class _LoginPageState extends State<LoginPage> {
               userModel.fullname!.isNotEmpty) {
             _navigateToMainApp();
           } else {
-            _navigateToUserDetails();
+            _navigateToUserDetails(LoginMethod.google);
           }
         } else {
           _navigateToWelcome();
@@ -570,6 +633,59 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _handleAppleSignIn() async {
+    setState(() {
+      _isAppleLoading = true;
+    });
+
+    try {
+      final UserCredential? userCredential =
+          await AppleAuthService.signInWithApple();
+
+      if (userCredential == null) {
+        setState(() {
+          _isAppleLoading = false;
+        });
+        return;
+      }
+
+      final User? user = userCredential.user;
+      if (user == null) {
+        throw Exception('Failed to get user information');
+      }
+
+      _showSnackBar('Apple sign-in successful!', isError: false);
+      await _registerDeviceAfterLogin();
+
+      try {
+        final userData = await AuthService.authenticateUser();
+
+        if (userData != null) {
+          final UserModel userModel = UserModel.fromJson(userData);
+
+          if (userModel.fullname != "Unknown User" &&
+              userModel.fullname!.isNotEmpty) {
+            _navigateToMainApp();
+          } else {
+            _navigateToUserDetails(LoginMethod.apple);
+          }
+        } else {
+          _navigateToWelcome();
+        }
+      } catch (e) {
+        _navigateToWelcome();
+      }
+    } on FirebaseAuthException catch (e) {
+      _handleFirebaseError(e);
+    } catch (e) {
+      _showSnackBar('Sign-in failed: ${e.toString()}', isError: true);
+    } finally {
+      setState(() {
+        _isAppleLoading = false;
+      });
+    }
+  }
+
   void _handleFirebaseError(FirebaseAuthException e) {
     String errorMessage;
     switch (e.code) {
@@ -580,7 +696,7 @@ class _LoginPageState extends State<LoginPage> {
         errorMessage = 'Invalid credentials';
         break;
       case 'operation-not-allowed':
-        errorMessage = 'Google sign-in is not enabled';
+        errorMessage = 'This sign-in method is not enabled';
         break;
       case 'user-disabled':
         errorMessage = 'This account has been disabled';
@@ -603,9 +719,9 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _registerDeviceAfterLogin() async {
     try {
       await DeviceService.registerDevice();
-      print('Device registered successfully for Google login');
+      print('Device registered successfully after login');
     } catch (e) {
-      print('Device registration failed for Google login: $e');
+      print('Device registration failed after login: $e');
     }
   }
 
@@ -615,12 +731,10 @@ class _LoginPageState extends State<LoginPage> {
     ).pushReplacement(MaterialPageRoute(builder: (context) => const MainApp()));
   }
 
-  void _navigateToUserDetails() {
+  void _navigateToUserDetails(LoginMethod loginMethod) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder:
-            (context) =>
-                const UserDetailRegPage(loginMethod: LoginMethod.google),
+        builder: (context) => UserDetailRegPage(loginMethod: loginMethod),
       ),
     );
   }
@@ -628,307 +742,6 @@ class _LoginPageState extends State<LoginPage> {
   void _navigateToWelcome() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (context) => const WelcomePage()),
-    );
-  }
-}
-
-// Minimal Email Registration Page - Also made responsive
-class MinimalEmailRegistrationPage extends StatefulWidget {
-  const MinimalEmailRegistrationPage({super.key});
-
-  @override
-  _MinimalEmailRegistrationPageState createState() =>
-      _MinimalEmailRegistrationPageState();
-}
-
-class _MinimalEmailRegistrationPageState
-    extends State<MinimalEmailRegistrationPage> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isTablet = screenWidth > 600;
-    final isLargeScreen = screenWidth > 900;
-
-    // Responsive sizing
-    final maxWidth =
-        isLargeScreen
-            ? 500.0
-            : (isTablet ? screenWidth * 0.7 : screenWidth * 0.9);
-    final fontSize = screenWidth < 400 ? 14.0 : 16.0;
-    final buttonHeight = screenHeight < 700 ? 50.0 : 56.0;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Email Registration',
-          style: AppFonts.semiBold18().copyWith(color: AppColors.textPrimary),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: screenWidth * 0.05,
-          vertical: screenHeight < 700 ? 16 : 24,
-        ),
-        child: Center(
-          child: Container(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Create Account',
-                  style: AppFonts.bold24().copyWith(
-                    fontSize:
-                        screenWidth < 400 ? 22.0 : (isTablet ? 28.0 : 24.0),
-                  ),
-                ),
-                SizedBox(height: screenHeight < 700 ? 6 : 8),
-                Text(
-                  'Quick registration with email only',
-                  style: AppFonts.regular16().copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: fontSize,
-                  ),
-                ),
-                SizedBox(height: screenHeight < 700 ? 30 : 40),
-
-                // Email Field
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  style: AppFonts.regular16().copyWith(fontSize: fontSize),
-                  decoration: InputDecoration(
-                    labelText: 'Email Address *',
-                    labelStyle: AppFonts.regular14().copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: fontSize - 2,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.textSecondary.withOpacity(0.3),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.primary,
-                        width: 2,
-                      ),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.email,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-                SizedBox(height: screenHeight < 700 ? 16 : 20),
-
-                // Password Field
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  style: AppFonts.regular16().copyWith(fontSize: fontSize),
-                  decoration: InputDecoration(
-                    labelText: 'Password *',
-                    labelStyle: AppFonts.regular14().copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: fontSize - 2,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.textSecondary.withOpacity(0.3),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.primary,
-                        width: 2,
-                      ),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.lock,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-                SizedBox(height: screenHeight < 700 ? 16 : 20),
-
-                // Name Field
-                TextField(
-                  controller: _nameController,
-                  style: AppFonts.regular16().copyWith(fontSize: fontSize),
-                  decoration: InputDecoration(
-                    labelText: 'Display Name (Optional)',
-                    labelStyle: AppFonts.regular14().copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: fontSize - 2,
-                    ),
-                    helperText: 'How others will see your reports',
-                    helperStyle: AppFonts.regular13().copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: fontSize - 3,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.textSecondary.withOpacity(0.3),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.primary,
-                        width: 2,
-                      ),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.person,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: screenHeight < 700 ? 30 : 40),
-
-                // Register Button
-                SizedBox(
-                  width: double.infinity,
-                  height: buttonHeight,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _registerWithEmail,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child:
-                        _isLoading
-                            ? CircularProgressIndicator(color: AppColors.white)
-                            : Text(
-                              'Create Account',
-                              style: AppFonts.semiBold16().copyWith(
-                                color: AppColors.white,
-                                fontSize: fontSize,
-                              ),
-                            ),
-                  ),
-                ),
-
-                SizedBox(height: screenHeight < 700 ? 16 : 20),
-
-                Text(
-                  'Additional setup will be required after registration for incident reporting features',
-                  style: AppFonts.regular13().copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: fontSize - 3,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _registerWithEmail() async {
-    if (_emailController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
-      _showSnackBar('Please fill in all required fields', isError: true);
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
-
-      if (_nameController.text.trim().isNotEmpty) {
-        await userCredential.user?.updateDisplayName(
-          _nameController.text.trim(),
-        );
-      }
-
-      if (mounted) {
-        _showSnackBar('Registration successful!', isError: false);
-        // Navigate directly to welcome or main app instead of PhoneSetupScreen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const WelcomePage()),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'weak-password':
-          errorMessage = 'The password provided is too weak.';
-          break;
-        case 'email-already-in-use':
-          errorMessage = 'The account already exists for that email.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is not valid.';
-          break;
-        default:
-          errorMessage = 'Registration failed. Please try again.';
-      }
-
-      if (mounted) {
-        _showSnackBar(errorMessage, isError: true);
-      }
-    } catch (e) {
-      if (mounted) {
-        _showSnackBar('Registration failed: $e', isError: true);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: AppFonts.regular14().copyWith(color: AppColors.white),
-        ),
-        backgroundColor: isError ? AppColors.textError : AppColors.textSuccess,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        margin: const EdgeInsets.all(16),
-      ),
     );
   }
 }

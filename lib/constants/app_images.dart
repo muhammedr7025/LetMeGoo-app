@@ -14,4 +14,5 @@ class AppImages {
       'assets/images/vehicle_not_found.webp';
   static const String home = 'assets/images/home.jpg';
   static const String logo = 'assets/icon/app_icon.png';
+  static const String appleLogo = 'assets/images/apple_logo.png';
 }

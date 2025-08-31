@@ -1,9 +1,12 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:letmegoo/constants/app_theme.dart';
 import 'package:letmegoo/constants/app_images.dart';
 import 'package:letmegoo/models/login_method.dart';
 import 'package:letmegoo/screens/email_login_page.dart';
+import 'package:letmegoo/screens/privacy_policy_page.dart';
+import 'package:letmegoo/screens/terms_and_condition_page.dart';
 import 'package:letmegoo/screens/user_detail_reg_page.dart';
 import 'package:letmegoo/services/device_service.dart';
 import 'dart:async';
@@ -277,6 +280,18 @@ class _EmailSignupPageState extends State<EmailSignupPage> {
                                       fontSize: fontSize - 2,
                                       decoration: TextDecoration.underline,
                                     ),
+                                    recognizer:
+                                        TapGestureRecognizer()
+                                          ..onTap = () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder:
+                                                    (context) =>
+                                                        const TermsAndConditionsPage(),
+                                              ),
+                                            );
+                                          },
                                   ),
                                   TextSpan(text: ' and '),
                                   TextSpan(
@@ -286,10 +301,25 @@ class _EmailSignupPageState extends State<EmailSignupPage> {
                                       fontSize: fontSize - 2,
                                       decoration: TextDecoration.underline,
                                     ),
+                                    recognizer:
+                                        TapGestureRecognizer()
+                                          ..onTap = () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder:
+                                                    (context) =>
+                                                        const PrivacyPolicyPage(),
+                                              ),
+                                            );
+                                          },
                                   ),
                                 ],
                               ),
                             ),
+
+                            // Don't forget to import gesture recognizer at the top of your file:
+                            // import 'package:flutter/gestures.dart';
                           ),
                         ),
                       ],

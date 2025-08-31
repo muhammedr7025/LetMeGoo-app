@@ -32,6 +32,16 @@
 				<string>com.googleusercontent.apps.357972744272-u2nc11kllos6vnilgvhi1khreuar0n0r</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.letmegoo.mobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>letmegoo</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
@@ -39,19 +49,27 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>dev-api.letmegoo.com/</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSExceptionMinimumTLSVersion</key>
+				<string>TLSv1.0</string>
+			</dict>
+		</dict>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to capture photos of vehicle incidents.</string>
+	<string>This app needs camera access to capture photos of vehicle incidents for reporting purposes.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs location access to report vehicle incidents at your current location.</string>
+	<string>This app needs location access to accurately report vehicle incidents at your current location and provide location-based emergency services.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs location access to report vehicle incidents at your current location.</string>
+	<string>This app needs location access to accurately report vehicle incidents at your current location and provide location-based emergency services.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>This app needs access to save photos to your photo library.</string>
+	<string>This app needs access to save incident photos to your photo library for your records.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs photo library access to select images for incident reports.</string>
+	<string>This app needs photo library access to select images for incident reports and documentation.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

@@ -1,4 +1,4 @@
-enum LoginMethod { email, google, unknown, phone }
+enum LoginMethod { email, google, unknown, phone, apple }
 
 extension LoginMethodExtension on LoginMethod {
   String get displayName {
@@ -10,8 +10,9 @@ extension LoginMethodExtension on LoginMethod {
       case LoginMethod.unknown:
         return 'Unknown';
       case LoginMethod.phone:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+        return 'Phone';
+      case LoginMethod.apple:
+        return 'Apple';
     }
   }
 
@@ -24,8 +25,9 @@ extension LoginMethodExtension on LoginMethod {
       case LoginMethod.unknown:
         return '';
       case LoginMethod.phone:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+        return 'phone';
+      case LoginMethod.apple:
+        return 'apple.com';
     }
   }
 }
